@@ -8,10 +8,10 @@ fn create_def() -> conf_def::Def {
             .tag_nodes(["text"])
                 .entry_text(None) 
             .tag_nodes(["include"])
-                .entry(None,None)
+                .entry(None)
                     .any()
             .tag_nodes(["hello"])
-                .rentry(None,Some("root_branch"))
+                .rentry_children(None,"root_branch")
                     .group(Some("ints"),true,true) 
                         .parse::<i32>()
                         .parse::<i32>()
@@ -23,12 +23,11 @@ fn create_def() -> conf_def::Def {
                     .group(Some("the any"),false,false)
                         .any()
             .tagless_nodes()
-                .entry(Some("somevals"), None)
+                .entry(Some("somevals"))
                     .group(None,false,true)
                         .parse::<i32>()
-
         //     .insert_nodes("rest_branch")
-        // .branch("rest_branch").tagless_nodes().entry(Some("rest"),Some("rest_branch")).group(None, false, true).any()
+        // .branch("rest_branch").tagless_nodes().entry_children(Some("rest"),"rest_branch").group(None, false, true).any()
 }
 
 fn walk_test() {

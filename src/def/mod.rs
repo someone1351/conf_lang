@@ -163,7 +163,20 @@ impl Def {
 
     pub fn entry(mut self,
         label : Option<&str>,
-        children : Option<&str>,
+    ) -> Self {
+        self.inner_entry();
+
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+            node.node_label=label.map(|x|x.to_string());
+        }
+
+        self
+    }
+
+    pub fn entry_children(mut self,
+        label : Option<&str>,
+        children : &str,
     ) -> Self {
         self.inner_entry();
 
@@ -171,14 +184,11 @@ impl Def {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.node_label=label.map(|x|x.to_string());
 
-            if let Some(children)=children {
-                node.children = NodeChildren::Branch(children.to_string());
-            }
+            node.children = NodeChildren::Branch(children.to_string());
         }
 
         self
     }
-
     pub fn entry_text(mut self,
         label : Option<&str>,
     ) -> Self {
@@ -195,7 +205,6 @@ impl Def {
     
     pub fn rentry(mut self,
         label : Option<&str>,
-        children : Option<&str>,
     ) -> Self {
         self.inner_entry();
         
@@ -203,10 +212,22 @@ impl Def {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
             node.node_label=label.map(|x|x.to_string());
+        }
 
-            if let Some(children)=children {
-                node.children = NodeChildren::Branch(children.to_string());
-            }
+        self
+    }
+
+    pub fn rentry_children(mut self,
+        label : Option<&str>,
+        children : &str,
+    ) -> Self {
+        self.inner_entry();
+        
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+            node.rsimilar=true;
+            node.node_label=label.map(|x|x.to_string());
+            node.children = NodeChildren::Branch(children.to_string());
         }
 
         self
