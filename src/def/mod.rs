@@ -15,6 +15,8 @@ pub struct Def {
     branches : Vec<Branch>,
     branch_map : HashMap<String,usize>, //Option<String>
     nodes : Vec<Node>,
+    
+    params : Vec<Param2>,
 
     cur_branch_ind : usize,
     for_tag_names : Vec<String>,
@@ -28,6 +30,7 @@ impl Def {
             branches : Vec::new(),
             branch_map : HashMap::new(),
             nodes : Vec::new(),
+            params : Vec::new(),
 
             cur_branch_ind:0,
             for_tag_names : Vec::new(),
@@ -303,38 +306,51 @@ impl Def {
         self
     }
 
-    fn inner_add_param_item(&mut self,param_item:Param) {        
+    fn inner_add_param_item(&mut self,param_item:Option<Param2>) {        
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
             self.inner_entry();
         }
 
+        //
+        let param_item_ind= param_item.map(|x|{
+            let param_ind=self.params.len();
+            self.params.push(x);
+            param_ind
+        });
+
+        let param_item_type=param_item_ind.map(|param_ind|self.params.get(param_ind).unwrap().0);
+
         //calc len of any repeating patterns in the param group eg (int bool int bool) => (int bool) => 2
         //bit inefficent to recalc patterns everytime a param is added, should instead do it once they are all added
         let (pattern_len,patterns_num)={
-            let mut params=self.nodes.last().unwrap()
+            let mut param_types=self.nodes.last().unwrap()
                 .param_groups.last().unwrap()
-                .params.iter().map(|x|x.map(|x|x.0))
+                // .params.iter().map(|x|x.map(|x|x.0))
+                // .params.iter().map(|x|x.as_ref().map(|x|x.0))
+                .params.iter().map(|&x|x.map(|param_ind|self.params.get(param_ind).unwrap().0))
+                
                 .collect::<Vec<_>>();
 
-            params.push(param_item.map(|x|x.0));
-
+            // param_types.push(param_item.as_ref().map(|x|x.0));
+            param_types.push(param_item_type);
+            
             //
             let mut ok=false;
-            let mut pattern = vec![params.get(0).cloned().unwrap()];
+            let mut pattern = vec![param_types.get(0).cloned().unwrap()];
 
-            for param_ind in 1 .. params.len() {
+            for param_ind in 1 .. param_types.len() {
                 ok=true;
 
-                if params.len()%pattern.len() !=0 {
-                    pattern.push(params.get(param_ind).cloned().unwrap());
+                if param_types.len()%pattern.len() !=0 {
+                    pattern.push(param_types.get(param_ind).cloned().unwrap());
                     continue;
                 }
         
-                for x in 1 .. params.len()/pattern.len() {
+                for x in 1 .. param_types.len()/pattern.len() {
                     let y=x*pattern.len();
                     let against_range=y..y+pattern.len();
-                    let against=params.get(against_range).unwrap();
+                    let against=param_types.get(against_range).unwrap();
         
                     if !pattern.eq(against) {
                         ok=false;
@@ -346,13 +362,13 @@ impl Def {
                     break;
                 }
         
-                pattern.push(params.get(param_ind).cloned().unwrap());
+                pattern.push(param_types.get(param_ind).cloned().unwrap());
             }
         
             if ok {
-                (pattern.len(),params.len()/pattern.len())
+                (pattern.len(),param_types.len()/pattern.len())
             } else {
-                (params.len(),1)
+                (param_types.len(),1)
             }
         };
 
@@ -361,7 +377,8 @@ impl Def {
             let node=self.nodes.get_mut(node_index).unwrap();
             let param_group=node.param_groups.last_mut().unwrap();
             
-            param_group.params.push(param_item);
+            // param_group.params.push(param_item);
+            param_group.params.push(param_item_ind);
             param_group.pattern_len=pattern_len;
             param_group.patterns_num=patterns_num;
         }
@@ -377,7 +394,18 @@ impl Def {
         T:FromStr+Any+Send+Sync,
     {
         let func2=|s:&str|T::from_str(s).ok().map(|p|Box::new(p) as Box<dyn Any+Send+Sync>);
-        let param_item:Param=Some((TypeId::of::<T>(),std::any::type_name::<T>(),func2));
+        let param_item:Option<Param2>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
+        self.inner_add_param_item(param_item);
+        
+        self
+    }
+    
+    pub fn func<T>(mut self, func:impl Fn(&str)->Option<T>+'static) -> Self
+    where
+        T:Any+Send+Sync,
+    {
+        let func2=move|s:&str|func(s).map(|p|Box::new(p) as Box<dyn Any+Send+Sync>);
+        let param_item:Option<Param2>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
         self.inner_add_param_item(param_item);
         
         self

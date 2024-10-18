@@ -22,6 +22,10 @@ fn walk_test1_def() -> conf_def::Def {
                         .parse::<i32>()
                     .group(Some("the any"),false,false)
                         .any()
+            .tag_nodes(["functest"])
+                .entry(None)
+                    .group(None, false, true)
+                        .func(|x|match x {"a"=>Some(111),"b"=>Some(222),"c"=>Some(333),_=>None})
             .tagless_nodes()
                 .entry(Some("somevals"))
                     .group(None,false,true)
@@ -58,6 +62,9 @@ fn walk_test1() {
                 println!("    {}",get_group_vals_info(record));
                 println!("    the int values are: {}",record.param_group("ints").values().parsed::<i32>().map(|x|format!("{x:?}")).collect::<Vec<_>>().join(", "));
                 println!("    any val is {:?}",record.param_group("the any").value(0).as_str());
+            }
+            Some("functest") if walk.is_enter() => {
+                println!("    functest: {:?}",record.values().parsed().collect::<Vec<i32>>());
             }
             _ =>{}
         }

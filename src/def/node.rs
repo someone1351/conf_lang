@@ -5,7 +5,9 @@ use std::any::Any;
 //     Group
 // }
 
-pub type Param=Option<(std::any::TypeId,&'static str,ParamParse)>;
+// pub type Param=Option<(std::any::TypeId,&'static str,ParamParse)>;
+pub type Param2=(std::any::TypeId,&'static str,ParamParse);
+
 
 #[derive (Default)]
 pub struct ParamGroup {
@@ -14,7 +16,8 @@ pub struct ParamGroup {
     pub repeat:bool,
     // pub first:bool,
     pub name:Option<String>,
-    pub params : Vec<Param>,
+    // pub params : Vec<Param>,
+    pub params : Vec<Option<usize>>,
     pub pattern_len:usize,
     pub patterns_num:usize,
 
@@ -30,7 +33,9 @@ pub enum NodeChildren {
     Body(Option<String>),
 }
 
-pub type ParamParse = fn(&str)->Option<Box<dyn Any+Send+Sync>>;
+// pub type ParamParse = fn(&str)->Option<Box<dyn Any+Send+Sync>>;
+
+pub type ParamParse = Box<dyn Fn(&str)->Option<Box<dyn Any+Send+Sync>>+'static>;
 
 #[derive (Default)]
 pub struct Node {
