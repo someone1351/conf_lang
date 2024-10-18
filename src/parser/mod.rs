@@ -864,7 +864,7 @@ pub fn parse_start<'a>(
             // }
         
             //            
-            let branch_name=cur_branch.name().to_string();
+            let branch_name=cur_branch.name().unwrap_or_default().to_string();
             let node_label=node.label().map(|x|x.to_string());
 
             let branch_name_text_ind= if let Some(text_ind)=text_map.get(&branch_name) {

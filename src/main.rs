@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::{Path, PathBuf}};
 
 use conf_def::{ Conf, RecordContainer, Walk};
 
@@ -30,11 +30,11 @@ fn create_def() -> conf_def::Def {
         // .branch("rest_branch").tagless_nodes().entry_children(Some("rest"),"rest_branch").group(None, false, true).any()
 }
 
-fn walk_test() {
+fn walk_test1() {
     let def = create_def();
-    let confs=load_confs(def);
+    let confs=load_confs(def,"examples/test1");
 
-    let Some(test_conf)=confs.get(&PathBuf::from("examples/test.conf")) else {
+    let Some(test_conf)=confs.get(&PathBuf::from("examples/test1/test.conf")) else {
         return;
     };
 
@@ -70,14 +70,61 @@ fn walk_test() {
     }
 }
 
-fn main() {
-    walk_test();
+fn walk_test2() {
+    let def = conf_def::Def::new()
+        .parse::<i32>()
+        .parse::<i32>()
+        ;
+
+    // let def = conf_def::Def::new()
+    //     .group(None,false,false)
+    //         .parse::<i32>()
+    //         .parse::<i32>()
+    //     ;
+
+    // let def = conf_def::Def::new()
+    //     .entry(None)
+    //         .parse::<i32>()
+    //         .parse::<i32>()
+    //     ;
+
+    // let def = conf_def::Def::new()
+    //     .branch("a")
+    //         .parse::<f32>()
+    //     .branch("b")
+    //         .parse::<bool>()
+    //     .branch("a")
+    //         .entry(None)
+    //             .parse::<i32>()
+    //             .parse::<i32>()
+    //     ;
+
+    let confs=load_confs(def,"examples/test2");
+
+    let Some(test_conf)=confs.get(&PathBuf::from("examples/test2/test.conf")) else {
+        return;
+    };
+
+    let res=test_conf.0.root().walk_ext::<&str>( |walk|{
+        println!("{}",get_record_info(&walk));
+        Ok(None)
+    });
+
+    if let Err(e)=res {
+        println!("{}",e.msg(e.path.as_ref().and_then(|p|confs.get(p)).map(|x|x.1.as_str())));
+    }
 }
 
-fn load_confs(def:conf_def::Def) -> HashMap<PathBuf, (Conf,String)> {
-    let root_branch=def.get_branch("root_branch").unwrap();
+fn main() {
+    walk_test1();
+    println!("===");
+    walk_test2();
+}
 
-    let file_paths = Vec::from_iter(std::fs::read_dir("examples").unwrap().filter_map(Result::ok)
+fn load_confs<P: AsRef<Path>>(def:conf_def::Def,dir:P) -> HashMap<PathBuf, (Conf,String)> {
+    let root_branch=def.get_root_branch(); //.get_branch("root_branch");
+
+    let file_paths = Vec::from_iter(std::fs::read_dir(dir).unwrap().filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|p| p.extension() == Some(std::ffi::OsStr::new("conf"))),
     );

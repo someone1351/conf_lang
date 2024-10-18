@@ -11,12 +11,12 @@ use branch::*;
 use node::*;
 use container::branch::*;
 
-
 pub struct Def {
     branches : Vec<Branch>,
-    branch_map : HashMap<String,usize>,
+    branch_map : HashMap<String,usize>, //Option<String>
     nodes : Vec<Node>,
 
+    cur_branch_ind : usize,
     for_tag_names : Vec<String>,
     cur_nodes_start : usize,
     tags_once:bool,
@@ -28,29 +28,49 @@ impl Def {
             branches : Vec::new(),
             branch_map : HashMap::new(),
             nodes : Vec::new(),
+
+            cur_branch_ind:0,
             for_tag_names : Vec::new(),
             cur_nodes_start : 0,
             tags_once:false,
         }
     }
 
-    pub fn get_branch(&self, branch_name : &str) -> Option<BranchContainer> {
-        self.branch_map.get(branch_name).map(|&branch_ind|BranchContainer {
+    pub fn get_root_branch(&self) -> BranchContainer {
+        BranchContainer {
             def:self,
-            branch_ind,
-        })
+            branch_ind:0,
+        }
     }
 
+    // pub fn get_branch(&self, branch_name : &str) -> Option<BranchContainer> {
+    //     self.branch_map.get(branch_name).map(|&branch_ind|BranchContainer {
+    //         def:self,
+    //         branch_ind,
+    //     })
+    // }
+
+    pub fn get_branch(&self, branch_name : &str) -> BranchContainer {
+        BranchContainer {
+            def:self,
+            branch_ind:self.branch_map.get(branch_name).cloned().unwrap_or(self.branches.len()),
+        }
+
+    }
     pub fn branch(mut self, branch_name : &str) -> Self {
-        if self.branch_map.contains_key(branch_name) { //panic or overwrite?
-            panic!("Branch label already used.")
+        if let Some(branch_ind)=self.branch_map.get(branch_name).cloned() {
+            self.cur_branch_ind=branch_ind;
+        } else {
+            // let branch_index = self.branches.len();
+            self.cur_branch_ind=self.branches.len();
+            self.branches.push(Branch::new(Some(branch_name.to_string())));
+            self.branch_map.insert(branch_name.to_string(), self.cur_branch_ind);
         }
 
         //
         self.cur_nodes_start = self.nodes.len();
-        let branch_index = self.branches.len();
-        self.branches.push(Branch::new(branch_name.to_string()));
-        self.branch_map.insert(branch_name.to_string(), branch_index);
+        self.for_tag_names.clear();
+        self.tags_once=false;
 
         //
         self
@@ -58,12 +78,14 @@ impl Def {
 
     pub fn insert_nodes(mut self, branch_name : &str) -> Self { //from branch_nodes_from
         //
-        if self.branches.len()==0 { //panic or do nothing?
-            panic!("confdef, no branch available!");
+        if self.branches.is_empty() {
+            self.branches.push(Default::default());
         }
 
         //
-        let cur_branch = self.branches.last_mut().unwrap();
+        // let cur_branch = self.branches.last_mut().unwrap();
+        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();        
+
         cur_branch.branch_inserts.push(branch_name.to_string());
         self.cur_nodes_start = self.nodes.len();
         self.tags_once=false;
@@ -74,11 +96,6 @@ impl Def {
     
     pub fn tagless_nodes(mut self, ) -> Self {
         //
-        if self.branches.len()==0 { //panic or do nothing?
-            panic!("confdef, no branch available!");
-        }
-
-        //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
         self.for_tag_names.clear();
         self.tags_once=false;
@@ -87,61 +104,57 @@ impl Def {
         self
     }
 
-    fn inner_tag_nodes<'t,T>(mut self, tag_names: T, once:bool) -> Self 
+    fn inner_tag_nodes<'t,T>(&mut self, tag_names: T, once:bool)
     where
         T:IntoIterator<Item = &'t str>,
     {
-        //if no param given to a tagless node, it will just have a node with no params, that will be skipped over during parsing
-        
-        //
-        if self.branches.len()==0 { //panic or do nothing?
-            panic!("confdef, no branch available!");
-        }
-
         //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
         self.for_tag_names.clear();        
         self.for_tag_names.extend(tag_names.into_iter().map(|x|x.to_string()));
         self.tags_once=once;
 
-        //
+    }
+
+    pub fn tag_nodes<'t,T>(mut self, tag_names: T) -> Self 
+    where
+        T:IntoIterator<Item = &'t str>,
+    {
+        self.inner_tag_nodes(tag_names,false);
         self
     }
 
-    pub fn tag_nodes<'t,T>(self, tag_names: T) -> Self 
+    pub fn tag_nodes_once<'t,T>(mut self, tag_names: T) -> Self 
     where
         T:IntoIterator<Item = &'t str>,
     {
-        self.inner_tag_nodes(tag_names,false)
-    }
-
-    pub fn tag_nodes_once<'t,T>(self, tag_names: T) -> Self 
-    where
-        T:IntoIterator<Item = &'t str>,
-    {
-        self.inner_tag_nodes(tag_names,true)
+        self.inner_tag_nodes(tag_names,true);
+        self
     }
 
     fn inner_entry(&mut self) {
         //adds a bunch of nodes for each tagname or if tagless a single node
 
-        if self.branches.len()==0 { //panic or do nothing?
-            panic!("confdef, no branch available!");
+        //
+        if self.branches.is_empty() {
+            self.branches.push(Default::default());
         }
 
         //
-        let branch_ind=self.branches.len()-1;
-        let cur_branch = self.branches.last_mut().unwrap();
+        // let branch_ind=self.branches.len()-1;
+        // let cur_branch = self.branches.last_mut().unwrap();
+        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();     
 
         //
         self.cur_nodes_start = self.nodes.len();
 
+        //
         if self.for_tag_names.len()==0 {
             let node_index = self.nodes.len();
             cur_branch.non_tags.push(node_index);
 
             self.nodes.push(Node{
-                branch_ind,
+                branch_ind:self.cur_branch_ind,
                 has_tag:false,
                 tag_once:self.tags_once,
                 param_groups:vec![ParamGroup::default()],
@@ -153,7 +166,9 @@ impl Def {
                 cur_branch.tags.entry(tag_name.clone()).or_default().push(node_index);
 
                 self.nodes.push(Node{
-                    branch_ind,has_tag:true,tag_once:self.tags_once,
+                    branch_ind:self.cur_branch_ind,
+                    has_tag:true,
+                    tag_once:self.tags_once,
                     param_groups:vec![ParamGroup::default()],
                     .. Default::default()
                 });
@@ -253,10 +268,12 @@ impl Def {
         optional:bool,
         repeat:bool,    
     ) -> Self {
+        //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
-            panic!("confdef, no nodes");
+            self.inner_entry();
         }
 
+        //
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             
@@ -276,11 +293,12 @@ impl Def {
         self
     }
 
-    fn inner_add_param_item(&mut self,param_item:Param) {
+    fn inner_add_param_item(&mut self,param_item:Param) {        
+        //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
-            panic!("confdef, no node to add param item to!");
+            self.inner_entry();
         }
-        
+
         //calc len of any repeating patterns in the param group eg (int bool int bool) => (int bool) => 2
         //bit inefficent to recalc patterns everytime a param is added, should instead do it once they are all added
         let (pattern_len,patterns_num)={

@@ -20,46 +20,52 @@ pub struct BranchContainer<'a> {
 
 impl<'a> BranchContainer<'a> {
     pub fn get_tag_nodes<'t>(&self,tag_name:&'t str) -> NodeContainerIter::<'a,'t> {
-        let branch=self.def.branches.get(self.branch_ind).unwrap();
+        let branch=self.def.branches.get(self.branch_ind);//.unwrap();
         
         NodeContainerIter {
             def:&self.def,
             tag_name:Some(tag_name),
             visited_branches:HashSet::new(),
-            to_visit_branches:vec![branch.branch_name.as_str()],
+            // to_visit_branches:vec![branch.branch_name.as_ref().map(|x|x.as_str())],
+            // to_visit_branches:vec![branch.map_or(None,|branch|branch.branch_name.as_ref().map(|x|x.as_str()))],
+            to_visit_branches:branch.map(|branch|vec![branch.branch_name.as_ref().map(|x|x.as_str())]).unwrap_or_default(),
             branch_ind:None,
             branch_node_ind:0,
         }
     }
 
     pub fn get_tagless_nodes(&self) -> NodeContainerIter::<'a,'_> {
-        let branch=self.def.branches.get(self.branch_ind).unwrap();
+        let branch=self.def.branches.get(self.branch_ind);//.unwrap();
 
         NodeContainerIter {
             def:&self.def,
             tag_name:None,
             visited_branches:HashSet::new(),
-            to_visit_branches:vec![branch.branch_name.as_str()],
+            // to_visit_branches:vec![branch.branch_name.as_ref().map(|x|x.as_str())],
+            // to_visit_branches:vec![branch.map_or(None,|branch|branch.branch_name.as_ref().map(|x|x.as_str()))],
+            to_visit_branches:branch.map(|branch|vec![branch.branch_name.as_ref().map(|x|x.as_str())]).unwrap_or_default(),
             branch_ind:None,
             branch_node_ind:0,
         }
     }
 
-    pub fn name(&self) -> &'a str {
-        let branch=self.def.branches.get(self.branch_ind).unwrap();
-        branch.branch_name.as_str()
+    pub fn name(&self) -> Option<&'a str> {
+        let branch=self.def.branches.get(self.branch_ind);//.unwrap();
+        // branch.branch_name.as_ref().map(|x|x.as_str())
+        branch.map_or(None,|branch|branch.branch_name.as_ref().map(|x|x.as_str()))
     }
+    
     pub fn branch_ind(&self) -> usize {
         self.branch_ind
     }
+
     pub fn parse<'b>(
         &self,
         // walk_branch:BranchContainer,
         src : &'b str, 
         keep_src:bool,
         path:Option<&'b Path>,
-    ) -> Result<Conf,ParseError> {
-    
+    ) -> Result<Conf,ParseError> {    
         parse_start(*self,src,keep_src,path)
     }
 }
