@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::{Path, PathBuf}};
 
 use conf_def::{ Conf, RecordContainer, Walk};
 
-fn create_def() -> conf_def::Def {
+fn walk_test1_def() -> conf_def::Def {
     conf_def::Def::new()
         .branch("root_branch")
             .tag_nodes(["text"])
@@ -31,7 +31,7 @@ fn create_def() -> conf_def::Def {
 }
 
 fn walk_test1() {
-    let def = create_def();
+    let def = walk_test1_def();
     let confs=load_confs(def,"examples/test1");
 
     let Some(test_conf)=confs.get(&PathBuf::from("examples/test1/test.conf")) else {

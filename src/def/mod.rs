@@ -96,6 +96,11 @@ impl Def {
     
     pub fn tagless_nodes(mut self, ) -> Self {
         //
+        if self.branches.is_empty() {
+            self.branches.push(Default::default());
+        }
+
+        //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
         self.for_tag_names.clear();
         self.tags_once=false;
@@ -108,6 +113,11 @@ impl Def {
     where
         T:IntoIterator<Item = &'t str>,
     {
+        //
+        if self.branches.is_empty() {
+            self.branches.push(Default::default());
+        }
+        
         //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
         self.for_tag_names.clear();        
