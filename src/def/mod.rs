@@ -16,7 +16,7 @@ pub struct Def {
     branch_map : HashMap<String,usize>, //Option<String>
     nodes : Vec<Node>,
     
-    params : Vec<Param2>,
+    params : Vec<Param>,
 
     cur_branch_ind : usize,
     for_tag_names : Vec<String>,
@@ -306,7 +306,7 @@ impl Def {
         self
     }
 
-    fn inner_add_param_item(&mut self,param_item:Option<Param2>) {        
+    fn inner_add_param_item(&mut self,param_item:Option<Param>) {        
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
             self.inner_entry();
@@ -384,28 +384,30 @@ impl Def {
         }
     }
 
-    pub fn any(mut self) -> Self { //str, any
+    pub fn param_any(mut self) -> Self { //str, any
         self.inner_add_param_item(None);
         self
     }
 
-    pub fn parse<T>(mut self) -> Self
+    pub fn param_parse<T>(mut self) -> Self
     where
         T:FromStr+Any+Send+Sync,
     {
         let func2=|s:&str|T::from_str(s).ok().map(|p|Box::new(p) as Box<dyn Any+Send+Sync>);
-        let param_item:Option<Param2>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
+        let param_item:Option<Param>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
         self.inner_add_param_item(param_item);
         
         self
     }
     
-    pub fn func<T>(mut self, func:impl Fn(&str)->Option<T>+'static) -> Self
+    pub fn param_func<T,F>(mut self, func:F) -> Self
     where
         T:Any+Send+Sync,
+        F:Fn(&str)->Option<T>+'static
+
     {
         let func2=move|s:&str|func(s).map(|p|Box::new(p) as Box<dyn Any+Send+Sync>);
-        let param_item:Option<Param2>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
+        let param_item:Option<Param>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
         self.inner_add_param_item(param_item);
         
         self

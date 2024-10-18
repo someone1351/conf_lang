@@ -6,7 +6,7 @@ use std::any::Any;
 // }
 
 // pub type Param=Option<(std::any::TypeId,&'static str,ParamParse)>;
-pub type Param2=(std::any::TypeId,&'static str,ParamParse);
+pub type Param=(std::any::TypeId,&'static str,ParamParse);
 
 
 #[derive (Default)]
