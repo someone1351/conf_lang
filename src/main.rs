@@ -30,6 +30,9 @@ fn walk_test1_def() -> conf_def::Def {
                 .entry(Some("somevals"))
                     .group(None,false,true)
                         .param_parse::<i32>()
+            .tag_nodes(["node"])
+                .entry_children(None, "root_branch")
+                    .param_any()
         //     .insert_nodes("rest_branch")
         // .branch("rest_branch").tagless_nodes().entry_children(Some("rest"),"rest_branch").group(None, false, true).any()
 }
@@ -42,7 +45,7 @@ fn walk_test1() {
         return;
     };
 
-    let res=test_conf.0.root().walk_ext::<&str>( |walk|{
+    let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
         let record=walk.record();
         println!("{}",get_record_info(&walk));
 
@@ -53,7 +56,10 @@ fn walk_test1() {
                 include_path.push(record.value(0).as_str());
     
                 return if let Some(conf_data)=confs.get(&include_path) {
-                    Ok(Some(conf_data.0.root()))
+                    walk.insert(conf_data.0.root());
+                    walk.insert(confs.get(&PathBuf::from("examples/test1/other_test2.conf")).unwrap().0.root());
+                    // Ok(Some(conf_data.0.root()))
+                    Ok(())
                 } else {
                     Err(("include file not found",Some(record.value(0).start_loc())))
                 };
@@ -66,10 +72,13 @@ fn walk_test1() {
             Some("functest") if walk.is_enter() => {
                 println!("    functest: {:?}",record.values().parsed().collect::<Vec<i32>>());
             }
+            Some("node") if walk.is_enter() => {
+                walk.skip_children();
+            }
             _ =>{}
         }
 
-        Ok(None)
+        Ok(())
     });
 
     if let Err(e)=res {
@@ -112,9 +121,8 @@ fn walk_test2() {
         return;
     };
 
-    let res=test_conf.0.root().walk_ext::<&str>( |walk|{
+    let res=test_conf.0.root().walk( |walk|{
         println!("{}",get_record_info(&walk));
-        Ok(None)
     });
 
     if let Err(e)=res {

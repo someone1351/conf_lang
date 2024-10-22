@@ -33,6 +33,9 @@ pub struct Walk<'b,'a> {
     order:usize,
     exit:bool,
     ancestors : &'b Vec<RecordContainer<'a>>,
+
+    skip_children : &'b mut bool,
+    traverse_inserts : &'b mut Vec<RecordContainer<'a>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -71,6 +74,14 @@ impl<'b,'a> Walk<'b,'a> {
     pub fn has_parent(&self) -> bool {
         !self.ancestors.is_empty()
     }
+
+    pub fn skip_children(&mut self) {
+        *self.skip_children=true;
+    }
+
+    pub fn insert(&mut self, record : RecordContainer<'a>) {
+        self.traverse_inserts.push(record);
+    }
 }
 
 struct Work<'a> {
@@ -85,7 +96,7 @@ struct Work<'a> {
 
 pub fn traverse<'a,E:Debug>(
     root_record : RecordContainer<'a>, 
-    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<Option<RecordContainer<'a>>,(E,Option<Loc>)>) -> Result<(),WalkError<E>> {
+    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),(E,Option<Loc>)>) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
     let mut stk=Vec::new();
@@ -107,7 +118,6 @@ pub fn traverse<'a,E:Debug>(
         }));
     }
 
-    
     //
     while let Some(cur)=stk.pop() {
         //walk ancestors
@@ -118,30 +128,31 @@ pub fn traverse<'a,E:Debug>(
         } else {
             walk_ancestors.clear();
         }
+        
+        //
+        let mut walk_skip_children=false;
+        let mut walk_traverse_inserts=Vec::new();
 
         //
-        // println!("== {:?}: {:?} => {:?}",
-        //     cur.record.branch_name(),
-        //     walk_ancestors.iter().map(|x|x.value_str(0)).collect::<Vec<_>>(),
-        //     cur.record.value_str(0),
-        // );
-      
-        //
-        if let Some(include_record) = callback(Walk { 
+        callback(Walk { 
             record: cur.record, 
             depth: cur.depth, 
             exit: cur.exit, 
             order:cur.exit.then_some(cur.exit_order).unwrap_or(order),
-            ancestors: walk_ancestors.as_ref(), 
+            ancestors: walk_ancestors.as_ref(),
+            skip_children:&mut walk_skip_children,
+            traverse_inserts:&mut walk_traverse_inserts,
         }).or_else(|(e,loc)|Err(WalkError {
             // src:cur.record.src(),
             path:cur.record.path().map(|p|p.to_path_buf()),
             loc: loc.unwrap_or(cur.record.start_loc()), 
             error_type: WalkErrorType::Custom(e), 
-        }))? {
+        }))?;
+
+        //
+        for include_record in walk_traverse_inserts.into_iter().rev() {
             let x=(include_record.path(),include_record.record_index());
             
-            // println!(" including in {:?} {:?}, from {:?} {:?}",cur.record.path(),cur.record.start_loc(),include_record.path(),include_record.start_loc());
             if cur.visiteds.contains(&x) {
                 return Err(WalkError{
                     // src:cur.record.src(),
@@ -154,7 +165,6 @@ pub fn traverse<'a,E:Debug>(
             let mut visiteds=cur.visiteds.clone();
             visiteds.insert(x);
 
-            // println!("pushing includes in {:?}, from {:?}",cur.record.path(),include_record.path());
             //push includes
             stk.extend(include_record.children().rev().map(|child|Work { 
                 record: child,
@@ -167,6 +177,7 @@ pub fn traverse<'a,E:Debug>(
             }));
         }
 
+        //
         if !cur.exit {
             //push exit
             stk.push(Work { 
@@ -179,16 +190,19 @@ pub fn traverse<'a,E:Debug>(
                 // include_origin:cur.include_origin,
             });
 
-            //push children
-            stk.extend(cur.record.children().rev().map(|child|Work { 
-                record: child,
-                depth:cur.depth+1,
-                exit:false,
-                exit_order:0,
-                walk_parent:Some(cur.record),
-                visiteds:cur.visiteds.clone(),
-                // include_origin:None,
-            }));
+            //
+            if !walk_skip_children { //only skips on enter, since not visiting children on exit
+                //push children
+                stk.extend(cur.record.children().rev().map(|child|Work { 
+                    record: child,
+                    depth:cur.depth+1,
+                    exit:false,
+                    exit_order:0,
+                    walk_parent:Some(cur.record),
+                    visiteds:cur.visiteds.clone(),
+                    // include_origin:None,
+                }));
+            }
 
             //
             order+=1;
