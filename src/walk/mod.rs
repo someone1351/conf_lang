@@ -172,15 +172,26 @@ pub fn traverse<'a,E:Debug>(
             visiteds.insert(x);
 
             //push includes
-            stk.extend(include_record.children().rev().map(|child|Work { 
-                record: child,
+            // stk.extend(include_record.children().rev().map(|child|Work { 
+            //     record: child,
+            //     depth:cur.depth,
+            //     exit:false,
+            //     exit_order:0,
+            //     walk_parent:cur.walk_parent,
+            //     visiteds:visiteds.clone(),
+            //     // include_origin:Some(cur.record),
+            // }));
+
+            //
+            stk.push(Work { 
+                record: include_record,
                 depth:cur.depth,
                 exit:false,
                 exit_order:0,
                 walk_parent:cur.walk_parent,
                 visiteds:visiteds.clone(),
                 // include_origin:Some(cur.record),
-            }));
+            });
         }
 
         //
