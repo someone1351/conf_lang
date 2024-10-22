@@ -121,7 +121,8 @@ fn walk_test2() {
         return;
     };
 
-    let res=test_conf.0.root().walk( |walk|{
+    let res=test_conf.0.root().walk( |mut walk|{
+        walk.skip_exit();
         println!("{}",get_record_info(&walk));
     });
 
