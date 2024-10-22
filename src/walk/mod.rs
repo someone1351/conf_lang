@@ -27,15 +27,15 @@ use super::lexer::Loc;
 
 
 
-pub struct Walk<'a> {
+pub struct Walk<'b,'a> {
     record:RecordContainer<'a>,
     depth:usize,
     order:usize,
     exit:bool,
-    ancestors : &'a Vec<RecordContainer<'a>>,
+    ancestors : &'b Vec<RecordContainer<'a>>,
 }
 
-impl<'a> Walk<'a> {
+impl<'b,'a> Walk<'b,'a> {
     pub fn record(&self) -> RecordContainer<'a> {
         self.record
     }
@@ -85,7 +85,7 @@ struct Work<'a> {
 
 pub fn traverse<'a,E:Debug>(
     root_record : RecordContainer<'a>, 
-    mut callback : impl for<'b> FnMut(Walk<'b>) -> Result<Option<RecordContainer<'a>>,(E,Option<Loc>)>) -> Result<(),WalkError<E>> {
+    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<Option<RecordContainer<'a>>,(E,Option<Loc>)>) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
     let mut stk=Vec::new();
