@@ -83,6 +83,12 @@ impl<'b,'a> Walk<'b,'a> {
     pub fn insert(&mut self, record : RecordContainer<'a>) {
         self.traverse_inserts.push(record);
     }
+    pub fn extend<I>(&mut self, records : I) 
+    where
+        I : IntoIterator<Item=RecordContainer<'a>>
+    {
+        self.traverse_inserts.extend(records);
+    }
     pub fn skip_exit(&mut self) {
         *self.skip_exit=true;
     }

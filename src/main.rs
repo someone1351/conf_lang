@@ -56,9 +56,11 @@ fn walk_test1() {
                 include_path.push(record.value(0).as_str());
     
                 return if let Some(conf_data)=confs.get(&include_path) {
-                    for child in conf_data.0.root().children() {
-                        walk.insert(child);
-                    }
+                    walk.extend(conf_data.0.root().children());
+                    
+                    // for child in conf_data.0.root().children() {
+                    //     walk.insert(child);
+                    // }
 
                     // for child in confs.get(&PathBuf::from("examples/test1/other_test2.conf")).unwrap().0.root().children() {
                     //     walk.insert(child);
