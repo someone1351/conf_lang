@@ -86,6 +86,13 @@ impl<'a> RecordContainer<'a> {
         self.value(if self.values_num()==0 {0}else{self.values_num()-1})
     }
 
+    pub fn get_first(&self) -> Option<ValueContainer<'a>> {
+        self.get_value(0)
+    }
+    pub fn get_last(&self) -> Option<ValueContainer<'a>> {
+        self.get_value(if self.values_num()==0 {0}else{self.values_num()-1})
+    }
+
     pub fn value(&self, ind : usize) -> ValueContainer<'a> {
         if self.conf.is_none() {return Default::default();};
         if ind >= self.values_num() {return Default::default();}
@@ -94,6 +101,16 @@ impl<'a> RecordContainer<'a> {
             conf:self.conf,
             conf_value_ind: self.record().values.start+ind+self.record_value_start_offset(),
         }
+    }
+
+    pub fn get_value(&self, ind : usize) -> Option<ValueContainer<'a>> {
+        if self.conf.is_none() {return None;};
+        if ind >= self.values_num() {return None;}
+
+        Some(ValueContainer {
+            conf:self.conf,
+            conf_value_ind: self.record().values.start+ind+self.record_value_start_offset(),
+        })
     }
 
     // pub fn parsed<T:Any+Copy>(&self, record_value_ind : usize) -> Option<T> {

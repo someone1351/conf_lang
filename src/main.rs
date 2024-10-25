@@ -53,7 +53,7 @@ fn walk_test1() {
             Some("include") if walk.is_enter() => { //include records from another file
                 let mut include_path=record.path().unwrap().to_path_buf();
                 include_path.pop();
-                include_path.push(record.value(0).as_str());
+                include_path.push(record.value(0).str());
     
                 return if let Some(conf_data)=confs.get(&include_path) {
                     walk.extend(conf_data.0.root().children());
@@ -77,7 +77,7 @@ fn walk_test1() {
             Some("hello") if walk.is_enter() => {
                 println!("    {}",get_group_vals_info(record));
                 println!("    the int values are: {}",record.param_group("ints").values().parsed::<i32>().map(|x|format!("{x:?}")).collect::<Vec<_>>().join(", "));
-                println!("    any val is {:?}",record.param_group("the any").value(0).as_str());
+                println!("    any val is {:?}",record.param_group("the any").value(0).str());
             }
             Some("functest") if walk.is_enter() => {
                 println!("    functest: {:?}",record.values().parsed().collect::<Vec<i32>>());
@@ -180,8 +180,8 @@ fn get_record_info(walk:&Walk) -> String {
         "   ".repeat(walk.depth()),
         walk.order(),
         record.tag().map(|x|format!("{x:?} : ")).unwrap_or_default(),
-        record.values().map(|x|format!("{:?}",x.as_str())).collect::<Vec<_>>().join(", "),
-        record.has_text().then(||format!(" : {:?} :",record.text_values().map(|x|x.as_str()).collect::<Vec<_>>().join("\n"))).unwrap_or_default(),
+        record.values().map(|x|format!("{:?}",x.str())).collect::<Vec<_>>().join(", "),
+        record.has_text().then(||format!(" : {:?} :",record.text_values().map(|x|x.str()).collect::<Vec<_>>().join("\n"))).unwrap_or_default(),
         record.branch_name().map(|x|format!("{x}")).unwrap_or("_".to_string()),
         record.node_label().map(|x|format!("{x}")).unwrap_or("_".to_string()),
         record.path().map(|x|format!("{x:?}")).unwrap_or("_".to_string()),
@@ -196,7 +196,7 @@ fn get_group_vals_info(record:RecordContainer) -> String {
                 param_group.name().map(|x|format!("{x:?}")).unwrap_or("_".to_string()), {
                 let x=(0..param_group.many_num()).map(|many_ind|{
                     let y=(0..param_group.params_num())
-                        .map(|param_ind|param_group.value(many_ind*param_group.params_num()+param_ind).as_str())
+                        .map(|param_ind|param_group.value(many_ind*param_group.params_num()+param_ind).str())
                         .collect::<Vec<_>>().join(", ");
                     if param_group.params_num()==1 {format!("{y}",)} else {format!("({y})",)}
                 }).collect::<Vec<_>>().join(", ");

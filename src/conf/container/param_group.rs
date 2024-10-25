@@ -48,7 +48,15 @@ impl<'a> ParamGroupContainer<'a> {
     //         conf:self.conf
     //     }
     // }
-    
+
+    pub fn get_first(&self) -> Option<ValueContainer<'a>> {
+        self.get_value(0)
+    }
+    pub fn get_last(&self) -> Option<ValueContainer<'a>> {
+        self.get_value(if self.values_num()==0 {0}else{self.values_num()-1})
+    }
+
+
     pub fn first(&self) -> ValueContainer<'a> {
         self.value(0)
     }
@@ -67,6 +75,19 @@ impl<'a> ParamGroupContainer<'a> {
             conf:self.conf,
             conf_value_ind: self.param_group().conf_values.start+ind,
         }
+    }
+
+    pub fn get_value(&self, ind : usize) -> Option<ValueContainer<'a>> {
+        if self.conf.is_none() {return None;};
+
+        if ind >= self.values_num() {
+            return None;
+        }
+
+        Some(ValueContainer {
+            conf:self.conf,
+            conf_value_ind: self.param_group().conf_values.start+ind,
+        })
     }
     
     pub fn values_num(&self) -> usize {

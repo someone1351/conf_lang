@@ -22,26 +22,26 @@ impl<'a> ValueContainer<'a> {
         val.end_loc
     }
 
-    pub fn str(&self) -> Option<&'a str> {
+    pub fn get_str(&self) -> Option<&'a str> {
         if self.conf.is_none() {return None;};
         let val=self.conf.unwrap().values.get(self.conf_value_ind).unwrap();
         let text=self.conf.unwrap().texts.get(val.text_ind).unwrap();
         Some(text.as_str())
     }
 
-    pub fn as_str(&self) -> &'a str {
-        self.str().unwrap_or_default()
+    pub fn str(&self) -> &'a str { //if record.get_value(x) use .str() as a value will always have a str
+        self.get_str().unwrap_or_default()
     }
 
-    pub fn parsed<T:Any+Clone>(&self) -> Option<T> {
+    pub fn get_parsed<T:Any+Clone>(&self) -> Option<T> {
         if self.conf.is_none() {return None;};
         let val=self.conf.unwrap().values.get(self.conf_value_ind).unwrap();
         let parsed=val.parsed_ind.map(|parsed_ind|self.conf.unwrap().parsed_values.get(parsed_ind).unwrap());
         parsed.and_then(|x|x.1.downcast_ref::<T>()).map(|x|x.clone())
     }
 
-    pub fn as_parsed<T:Any+Default+Clone>(&self) -> T {
-        self.parsed().unwrap_or_default()
+    pub fn parsed<T:Any+Default+Clone>(&self) -> T {
+        self.get_parsed().unwrap_or_default()
     }
 
     pub fn parsed_name(&self) -> Option<&'static str> {

@@ -38,7 +38,7 @@ impl<'a,T:Any+Clone> Iterator for ValueParsedIter<'a,T> {
                 conf_value_ind: value_index,
             };
 
-            v.parsed()
+            v.get_parsed()
         }
     }
 }
@@ -53,7 +53,7 @@ impl<'a,T:Any+Clone> DoubleEndedIterator for ValueParsedIter<'a,T> {
                 conf_value_ind: self.conf_value_end,
             };
 
-            v.parsed()
+            v.get_parsed()
         } else {
             None
         }

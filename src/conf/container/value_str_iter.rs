@@ -23,7 +23,7 @@ impl<'a> Iterator for ValueStrIter<'a> {
                 conf_value_ind: value_index,
             };
 
-            Some(v.as_str())
+            Some(v.str())
         }
     }
 }
@@ -38,7 +38,7 @@ impl<'a> DoubleEndedIterator for ValueStrIter<'a> {
                 conf_value_ind: self.conf_value_end,
             };
 
-            Some(v.as_str())
+            Some(v.str())
         } else {
             None
         }
