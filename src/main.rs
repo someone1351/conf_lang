@@ -33,8 +33,8 @@ fn walk_test1_def() -> conf_def::Def {
             .tag_nodes(["node"])
                 .entry_children(None, "root_branch")
                     .param_any()
-        //     .insert_nodes("rest_branch")
-        // .branch("rest_branch").tagless_nodes().entry_children(Some("rest"),"rest_branch").group(None, false, true).any()
+        //     .include(["rest_branch"])
+        // .branch("rest_branch").tagless_nodes().entry_children(Some("rest"),"rest_branch").group(None, false, true).param_any()
 }
 
 fn walk_test1() {

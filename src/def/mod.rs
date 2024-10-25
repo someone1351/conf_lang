@@ -79,7 +79,10 @@ impl Def {
         self
     }
 
-    pub fn insert_nodes(mut self, branch_name : &str) -> Self { //from branch_nodes_from
+    pub fn include<'a,B>(mut self, branch_names : B) -> Self 
+    where 
+        B :IntoIterator<Item = &'a str>
+    { //from branch_nodes_from
         //
         if self.branches.is_empty() {
             self.branches.push(Default::default());
@@ -87,11 +90,15 @@ impl Def {
 
         //
         // let cur_branch = self.branches.last_mut().unwrap();
-        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();        
+        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
+        
+        for branch_name in branch_names.into_iter() {
+            cur_branch.branch_inserts.push(branch_name.to_string());
+        }
 
-        cur_branch.branch_inserts.push(branch_name.to_string());
-        self.cur_nodes_start = self.nodes.len();
-        self.tags_once=false;
+        // cur_branch.branch_inserts.push(branch_name.to_string());
+        self.cur_nodes_start = self.nodes.len(); //why?
+        self.tags_once=false; //why?
 
         //
         self
@@ -204,7 +211,7 @@ impl Def {
 
     pub fn entry_children(mut self,
         label : Option<&str>,
-        children : &str,
+        children : &str, //would like to make this an array of branches that can be used as children, but no idea on how to modify code in the parser to handle that
     ) -> Self {
         self.inner_entry();
 

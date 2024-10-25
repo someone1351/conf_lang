@@ -147,40 +147,6 @@ pub fn parse_start<'a>(
             if !tokens.is_empty() {
                 //
                 let last_record_ind=temp_records.len()-1; //records len will always be > 1
-                // let record_ind=temp_records.len();
-
-                //
-                // let cur_branch=if node_children_stk.len()==1 {
-                //     root_branch
-                // } else {
-                //     let NodeChildrenContainer::Branch(branch)=node_children_stk.get(node_children_stk.len()-2).unwrap().clone() else {
-                //         panic!("");
-                //     };
-                //     branch
-                // };
-
-                // let branch_name=cur_branch.name().to_string();
-                // let node_label=node_children_stk.last().unwrap().body_node_label().map(|x|x.to_string());
-
-                // let branch_name_text_ind= if let Some(text_ind)=text_map.get(&branch_name) {
-                //     *text_ind
-                // } else {
-                //     let text_ind=texts.len();
-                //     text_map.insert(branch_name.clone(), text_ind);
-                //     texts.push(branch_name);
-                //     text_ind
-                // };
-
-                // let node_label_text_ind= node_label.map(|node_label|{
-                //     if let Some(text_ind)=text_map.get(&node_label) {
-                //         *text_ind
-                //     } else {
-                //         let text_ind=texts.len();
-                //         text_map.insert(node_label.clone(), text_ind);
-                //         texts.push(node_label);
-                //         text_ind
-                //     }
-                // });
 
                 let val_start=all_values.len();
 
@@ -197,17 +163,6 @@ pub fn parse_start<'a>(
                 }));
 
                 let val_end=all_values.len();
-
-                // temp_records.push(TempRecord { 
-                //     parent:Some(last_record_ind), 
-                //     children_records: Vec::new(), 
-                //     children_text:true,
-                //     param_groups:0..0,
-                //     values : val_start..val_end,
-                //     branch_name:Some(branch_name_text_ind),
-                //     node_label:node_label_text_ind,
-                //     tag:false,
-                // });
 
                 let parent_record=temp_records.get_mut(last_record_ind).unwrap();
                 parent_record.children_text=Some(val_start..val_end)
@@ -259,11 +214,14 @@ pub fn parse_start<'a>(
             node_children_stk.truncate(indent);
 
             //
+            //how to modify this so that NodeChildrenContainer::Branch can contain multiple branches to be used as children?
             let cur_branch=if indent==0 {
                 root_branch
             } else {
                 match node_children_stk.last().unwrap().clone() {
-                    NodeChildrenContainer::BranchMissing(branch_name)=> {
+                    NodeChildrenContainer::BranchMissing(branch_name)=> { 
+                        //is this really needed? can quietly ignore missing children branches instead?
+                        //  kinda needed on that there was children found, but the branch was missing that specified the children
                         return Err(ParseError{
                             path:path.map(|p|p.to_path_buf()),
                             loc:record_vals.first().unwrap().start_loc,
@@ -291,18 +249,12 @@ pub fn parse_start<'a>(
             let mut record_attempted_parse_vals:HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>=HashMap::new(); //[record_val_ind][type_id]=any
             let first_val_text=texts.get(record_vals.first().unwrap().text_ind).unwrap().clone();
 
-            // struct ExtractedParsedParam {
-            //     param_group_ind:usize, param_ind:usize,
-            // }
-
-            // let mut extracted_parsed_params = HashMap::<usize,ExtractedParsedParam>::new();//[record_val_ind]=(param_group_ind, param_ind)
             let mut cur_param_groups=Vec::<TempParamGroup>::new();
             
             //look at nodes
             for node in cur_branch.get_tag_nodes(first_val_text.as_str()).chain(cur_branch.get_tagless_nodes()) {
 
                 cur_param_groups.clear();
-                // extracted_parsed_params.clear();
                 
                 let record_val_start=node.has_tag().then_some(1).unwrap_or(0);
                 let record_vals_num=record_vals.len()-record_val_start;
@@ -311,8 +263,6 @@ pub fn parse_start<'a>(
                 let mut ok=true;
 
                 if node.param_groups_num()==1 {
-                    //println!("0000");
-
                     //
                     let param_group=node.param_group(0).unwrap();
                     let params_num=param_group.params_num();
@@ -345,8 +295,6 @@ pub fn parse_start<'a>(
                                 ok=false;
                                 break;
                             }
-
-                            // extracted_parsed_params.insert(record_val_ind, ExtractedParsedParam { param_group_ind: 0, param_ind, });
                         }
                     }
 
@@ -372,8 +320,6 @@ pub fn parse_start<'a>(
                         }
                     });
                 } else {
-                    //println!("1111");
-
                     //
                     let mut record_val_ind=record_val_start;
                     let mut param_group_ind=0;
@@ -387,14 +333,6 @@ pub fn parse_start<'a>(
                             ok=false; //not really necessary?
                             break;
                         }
-
-                        //
-                        // for x in 0..node.param_groups_num() {
-                        //     let pg=node.param_group(x).unwrap();
-                        //     let pattern_len=pg.params_pattern_len();
-                        //     let s=(0..pattern_len).map(|y|pg.param_type_name(y).map(|z|z.to_string()).unwrap_or("any".to_string())).collect::<Vec<String>>().join(", ");
-                        //     println!("{x}: {s}");
-                        // }
 
                         //handle adjacent param groups that share a pattern
                         if param_group.optional() || param_group.repeat() {
@@ -581,21 +519,8 @@ pub fn parse_start<'a>(
                                                 }
                                             });
 
-                                            // for i in 0 .. record_val_num {
-                                            //     let param_ind=i%param_group2.params_num();
-                                            //     let record_val_ind2=record_val_ind+i;
-                                                
-                                            //     extracted_parsed_params.insert(record_val_ind2, ExtractedParsedParam { 
-                                            //         param_group_ind: param_group_ind2, param_ind, 
-                                            //     });
-                                            // }
-
                                             record_val_ind+=record_val_num;
     
-                                            //
-                                            // param_group_record_val_start=record_val_ind;
-
-                                            // record_val_ind=record_val_ind2;
                                         }
                                         
                                         param_group_ind=param_group_ind2;
@@ -634,10 +559,6 @@ pub fn parse_start<'a>(
                                             let text=texts.get(val.text_ind).unwrap();
                                             let v=param_group.param(param_ind, text.as_str());
                                             
-                                            // if v.is_some() {
-                                            //     extracted_parsed_params.insert(record_val_ind, ExtractedParsedParam { param_group_ind, param_ind, });
-                                            // }
-
                                             v.map(|v|(param_group.param_type_name(param_ind).unwrap(),v))
                                         }).is_some()
                                     }).unwrap_or(true);
@@ -846,22 +767,6 @@ pub fn parse_start<'a>(
 
             //
             node_children_stk.push(node.children());
-
-            // //store parsed values for record
-            // for (record_val_ind,extracted_parsed_param) in extracted_parsed_params //0 .. node.params_num() 
-            // {
-            //     if let Some(type_id)=node.param_group(extracted_parsed_param.param_group_ind).unwrap()
-            //         .param_type_id(extracted_parsed_param.param_ind) //.param_type_id(node_val_ind) 
-            //     {
-            //         let record_val_start=node.has_tag().then_some(1).unwrap_or(0);
-            //         let parsed_vals=record_attempted_parse_vals.get_mut(&(record_val_ind-record_val_start)).unwrap();
-            //         let parsed_val=parsed_vals.remove(&type_id).unwrap();
-            //         let value=all_values.get_mut(conf_val_start+record_val_ind).unwrap();
-                    
-            //         value.parsed_ind=Some(all_parsed_values.len());
-            //         all_parsed_values.push(parsed_val.unwrap());
-            //     }
-            // }
         
             //            
             let branch_name=cur_branch.name().unwrap_or_default().to_string();
