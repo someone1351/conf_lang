@@ -217,6 +217,13 @@ pub fn traverse<'a,E:Debug>(
         }
 
         //
+        //allow inserting children on exit?
+        //allow inserting on exit?
+        
+        //on enter add: includes, exit, insert children, children, 
+        //on exit add: includes, insert children,
+
+        //
         if !cur.exit { 
             //push exit
             if !walk_skip_exit { //skip_exit obviously only works on enter
@@ -230,21 +237,23 @@ pub fn traverse<'a,E:Debug>(
                     // include_origin:cur.include_origin,
                 });
             }
+        }
 
-            //
+        //push inserted children, doesn't care about skip_children, and can be inserted on exit
+        stk.extend(walk_traverse_child_inserts.iter().rev().map(|&child|Work { 
+            record: child,
+            depth:cur.depth+1,
+            exit:false,
+            exit_order:0,
+            walk_parent:Some(cur.record),
+            visiteds:cur.visiteds.clone(),
+            // include_origin:None,
+        }));
+
+        //
+        if !cur.exit { 
+            //push children
             if !walk_skip_children { //only skips on enter, since not visiting children on exit
-                //push inserted children
-                stk.extend(walk_traverse_child_inserts.iter().rev().map(|&child|Work { 
-                    record: child,
-                    depth:cur.depth+1,
-                    exit:false,
-                    exit_order:0,
-                    walk_parent:Some(cur.record),
-                    visiteds:cur.visiteds.clone(),
-                    // include_origin:None,
-                }));
-
-                //push children
                 stk.extend(cur.record.children().rev().map(|child|Work { 
                     record: child,
                     depth:cur.depth+1,
