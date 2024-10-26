@@ -36,6 +36,7 @@ pub struct Walk<'b,'a> {
 
     skip_children : &'b mut bool,
     traverse_inserts : &'b mut Vec<RecordContainer<'a>>,
+    traverse_child_inserts : &'b mut Vec<RecordContainer<'a>>,
     skip_exit : &'b mut bool,
 }
 
@@ -83,12 +84,25 @@ impl<'b,'a> Walk<'b,'a> {
     pub fn insert(&mut self, record : RecordContainer<'a>) {
         self.traverse_inserts.push(record);
     }
+
     pub fn extend<I>(&mut self, records : I) 
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {
         self.traverse_inserts.extend(records);
     }
+
+    pub fn insert_child(&mut self, record : RecordContainer<'a>) {
+        self.traverse_child_inserts.push(record);
+    }
+    
+    pub fn extend_children<I>(&mut self, records : I) 
+    where
+        I : IntoIterator<Item=RecordContainer<'a>>
+    {
+        self.traverse_child_inserts.extend(records);
+    }
+
     pub fn skip_exit(&mut self) {
         *self.skip_exit=true;
     }
@@ -142,6 +156,7 @@ pub fn traverse<'a,E:Debug>(
         //
         let mut walk_skip_children=false;
         let mut walk_traverse_inserts=Vec::new();
+        let mut walk_traverse_child_inserts=Vec::new();
         let mut walk_skip_exit=false;
 
         //
@@ -153,6 +168,7 @@ pub fn traverse<'a,E:Debug>(
             ancestors: walk_ancestors.as_ref(),
             skip_children:&mut walk_skip_children,
             traverse_inserts:&mut walk_traverse_inserts,
+            traverse_child_inserts:&mut walk_traverse_child_inserts,
             skip_exit:&mut walk_skip_exit,
         }).or_else(|(e,loc)|Err(WalkError {
             // src:cur.record.src(),
@@ -201,20 +217,33 @@ pub fn traverse<'a,E:Debug>(
         }
 
         //
-        if !cur.exit && !walk_skip_exit { //skip_exit obviously only works on enter
+        if !cur.exit { 
             //push exit
-            stk.push(Work { 
-                record: cur.record,
-                depth:cur.depth,
-                exit:true, 
-                exit_order:order,
-                walk_parent:cur.walk_parent, 
-                visiteds:cur.visiteds.clone(),
-                // include_origin:cur.include_origin,
-            });
+            if !walk_skip_exit { //skip_exit obviously only works on enter
+                stk.push(Work { 
+                    record: cur.record,
+                    depth:cur.depth,
+                    exit:true, 
+                    exit_order:order,
+                    walk_parent:cur.walk_parent, 
+                    visiteds:cur.visiteds.clone(),
+                    // include_origin:cur.include_origin,
+                });
+            }
 
             //
             if !walk_skip_children { //only skips on enter, since not visiting children on exit
+                //push inserted children
+                stk.extend(walk_traverse_child_inserts.iter().rev().map(|&child|Work { 
+                    record: child,
+                    depth:cur.depth+1,
+                    exit:false,
+                    exit_order:0,
+                    walk_parent:Some(cur.record),
+                    visiteds:cur.visiteds.clone(),
+                    // include_origin:None,
+                }));
+
                 //push children
                 stk.extend(cur.record.children().rev().map(|child|Work { 
                     record: child,

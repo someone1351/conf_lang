@@ -1,6 +1,8 @@
 
+use core::panic;
 // use std::any::Any;
 use std::fmt::Debug;
+use std::ops::{Bound, RangeBounds};
 use std::path::Path;
 
 use super::super::{Conf,Record};
@@ -99,7 +101,7 @@ impl<'a> RecordContainer<'a> {
 
         ValueContainer {
             conf:self.conf,
-            conf_value_ind: self.record().values.start+ind+self.record_value_start_offset(),
+            conf_value_ind: self.record().conf_values.start+ind+self.record_value_start_offset(),
         }
     }
 
@@ -109,7 +111,7 @@ impl<'a> RecordContainer<'a> {
 
         Some(ValueContainer {
             conf:self.conf,
-            conf_value_ind: self.record().values.start+ind+self.record_value_start_offset(),
+            conf_value_ind: self.record().conf_values.start+ind+self.record_value_start_offset(),
         })
     }
 
@@ -123,7 +125,7 @@ impl<'a> RecordContainer<'a> {
 
     pub fn values_num(&self) -> usize {
         if self.conf.is_none() {return 0;};
-        self.record().values.len()-self.record_value_start_offset()
+        self.record().conf_values.len()-self.record_value_start_offset()
     }
 
     // pub fn child_text_value(&self, i : usize) -> Option<ValueContainer<'a>> {
@@ -272,11 +274,76 @@ impl<'a> RecordContainer<'a> {
         if self.conf.is_none() {return Default::default();};
 
         ValueIter {
-            conf_value_start:self.record().values.start+self.record_value_start_offset(),
-            conf_value_end:self.record().values.end,
+            conf_value_start:self.record().conf_values.start+self.record_value_start_offset(),
+            conf_value_end:self.record().conf_values.end,
             conf:self.conf,
         }
     }
+
+    pub fn get_values<R:RangeBounds<usize>>(&self,r:R) -> Option<ValueIter<'a>> {
+        if self.conf.is_none() {return None;}
+
+        let range_start=match r.start_bound() {
+            Bound::Included(x)=>*x,
+            Bound::Excluded(_)=>panic!(""),
+            Bound:: Unbounded=>0,
+        };
+
+        let range_end=match r.start_bound() {
+            Bound::Included(x)=>*x+1,
+            Bound::Excluded(x)=>*x,
+            Bound:: Unbounded=>self.values_num(),
+        };
+
+        if range_start>range_end {return None;} //if range start==end will return some empty iter
+
+        let x_len=range_end-range_start;
+
+        if x_len>self.values_num() {return None;}
+
+        let x_start=self.record().conf_values.start+self.record_value_start_offset() + range_start;
+        let x_end = x_start+x_len;
+
+        Some(ValueIter {
+            conf_value_start:x_start,
+            conf_value_end:x_end,
+            conf:self.conf,
+        })
+    }
+
+    pub fn get_parsed_array<T:Copy+'static, const COUNT: usize>(&self,init:T) -> Option<[T;COUNT]> {
+        let mut array=[init;COUNT];
+
+        for i in 0..COUNT {
+            if let Some(value)=self.get_value(i) {
+                if let Some(parsed)=value.get_parsed::<T>() {
+                    array[i]=parsed;
+                } else { //if parsed fails, then return nothing
+                    return None; 
+                }
+            } else { //if not enough values, return what was already gotten, and the rest uses the init
+                break;
+            }
+        }
+        
+        Some(array)
+    }
+
+
+        // if COUNT>self.values_num() {
+        //    return None; 
+        // }
+
+        // let x=Vec::<i32>::new();
+        // x.get(index)
+
+    // pub fn values_parsed_array<T:Clone>(&self) -> Option<Vec<T>> {
+    //     if COUNT>self.values_num() {
+    //        return None; 
+    //     }
+
+    //     Some([init.clone();COUNT])
+    // }
 
     // pub fn strs(&self) -> ValueStrIter<'a> {
     //     if self.conf.is_none() {return Default::default();};
@@ -382,7 +449,7 @@ impl<'a> RecordContainer<'a> {
         if self.conf.is_none() {return Default::default();};
 
         self.record().tag.then(||{
-            let text_ind=self.conf.unwrap().values.get(self.record().values.start).unwrap().text_ind;
+            let text_ind=self.conf.unwrap().values.get(self.record().conf_values.start).unwrap().text_ind;
             self.conf.unwrap().texts.get(text_ind).unwrap().as_str()
         })
     }
@@ -395,14 +462,14 @@ impl<'a> RecordContainer<'a> {
     pub fn start_loc(&self) -> Loc {
         if self.conf.is_none() {return Default::default();};
 
-        let val_ind=self.record().values.start;
+        let val_ind=self.record().conf_values.start;
         self.conf.unwrap().values.get(val_ind).unwrap().start_loc
     }
 
     pub fn end_loc(&self) -> Loc {
         if self.conf.is_none() {return Default::default();};
 
-        let val_ind=self.record().values.end-1;
+        let val_ind=self.record().conf_values.end-1;
         self.conf.unwrap().values.get(val_ind).unwrap().end_loc
     }
 

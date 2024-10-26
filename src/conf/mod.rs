@@ -22,7 +22,7 @@ pub struct Record {
     pub parent : Option<usize>,
     pub children : Range<usize>,
     pub children_text:bool,
-    pub values : Range<usize>,
+    pub conf_values : Range<usize>,
     pub param_groups : Range<usize>,
     pub node_label : Option<usize>,
     pub branch_name : Option<usize>,

@@ -1,5 +1,7 @@
 // use std::any::Any;
 
+use std::ops::{Bound, RangeBounds};
+
 use super::super::super::conf::ParamGroup;
 
 use super::super::Conf;
@@ -103,6 +105,53 @@ impl<'a> ParamGroupContainer<'a> {
             conf_value_end:self.param_group().conf_values.end,
             conf:self.conf,
         }
+    }
+    pub fn get_values<R:RangeBounds<usize>>(&self,r:R) -> Option<ValueIter<'a>> {
+        if self.conf.is_none() {return None;}
+
+        let range_start=match r.start_bound() {
+            Bound::Included(x)=>*x,
+            Bound::Excluded(_)=>panic!(""),
+            Bound:: Unbounded=>0,
+        };
+
+        let range_end=match r.start_bound() {
+            Bound::Included(x)=>*x+1,
+            Bound::Excluded(x)=>*x,
+            Bound:: Unbounded=>self.values_num(),
+        };
+
+        if range_start>range_end {return None;} //if range start==end will return some empty iter
+
+        let x_len=range_end-range_start;
+
+        if x_len>self.values_num() {return None;}
+
+        let x_start=self.param_group().conf_values.start+range_start;
+        let x_end = x_start+x_len;
+
+        Some(ValueIter {
+            conf_value_start:x_start,
+            conf_value_end:x_end,
+            conf:self.conf,
+        })
+    }
+    pub fn get_parsed_array<T:Copy+'static, const COUNT: usize>(&self,init:T) -> Option<[T;COUNT]> {
+        let mut array=[init;COUNT];
+
+        for i in 0..COUNT {
+            if let Some(value)=self.get_value(i) {
+                if let Some(parsed)=value.get_parsed::<T>() {
+                    array[i]=parsed;
+                } else { //if parsed fails, then return nothing
+                    return None; 
+                }
+            } else { //if not enough values, return what was already gotten, and the rest uses the init
+                break;
+            }
+        }
+        
+        Some(array)
     }
 
     // pub fn strs(&self) -> ValueStrIter<'a> {

@@ -830,7 +830,7 @@ pub fn parse_start<'a>(
     //
     let mut records = vec![Record { 
         param_groups:0..0,
-        values: 0..0, 
+        conf_values: 0..0, 
         parent: None, 
         children: 0..0, 
         children_text:false,
@@ -853,7 +853,7 @@ pub fn parse_start<'a>(
                 children: child_temp_record.children_text.clone().unwrap_or(0..0), 
                 children_text:child_temp_record.children_text.is_some(),
                 param_groups:child_temp_record.param_groups.clone(),
-                values: child_temp_record.values.clone(), 
+                conf_values: child_temp_record.values.clone(), 
                 node_label: child_temp_record.node_label, 
                 branch_name: child_temp_record.branch_name,
                 tag:child_temp_record.tag,
