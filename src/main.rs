@@ -46,6 +46,7 @@ fn walk_test1() {
     };
 
     let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
+        walk.have_exit();
         let record=walk.record();
         println!("{}",get_record_info(&walk));
 
@@ -132,8 +133,8 @@ fn walk_test2() {
         return;
     };
 
-    let res=test_conf.0.root().walk( |mut walk|{
-        walk.skip_exit();
+    let res=test_conf.0.root().walk( |walk|{
+        // walk.skip_exit();
         println!("{}",get_record_info(&walk));
     });
 

@@ -37,7 +37,8 @@ pub struct Walk<'b,'a> {
     skip_children : &'b mut bool,
     traverse_inserts : &'b mut Vec<RecordContainer<'a>>,
     traverse_child_inserts : &'b mut Vec<RecordContainer<'a>>,
-    skip_exit : &'b mut bool,
+    // skip_exit : &'b mut bool,
+    have_exit : &'b mut bool,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -103,8 +104,12 @@ impl<'b,'a> Walk<'b,'a> {
         self.traverse_child_inserts.extend(records);
     }
 
-    pub fn skip_exit(&mut self) {
-        *self.skip_exit=true;
+    // pub fn skip_exit(&mut self) {
+    //     *self.skip_exit=true;
+    // }
+    
+    pub fn have_exit(&mut self) {
+        *self.have_exit=true;
     }
 }
 
@@ -157,7 +162,8 @@ pub fn traverse<'a,E:Debug>(
         let mut walk_skip_children=false;
         let mut walk_traverse_inserts=Vec::new();
         let mut walk_traverse_child_inserts=Vec::new();
-        let mut walk_skip_exit=false;
+        // let mut walk_skip_exit=false;
+        let mut walk_have_exit=false;
 
         //
         callback(Walk { 
@@ -169,7 +175,8 @@ pub fn traverse<'a,E:Debug>(
             skip_children:&mut walk_skip_children,
             traverse_inserts:&mut walk_traverse_inserts,
             traverse_child_inserts:&mut walk_traverse_child_inserts,
-            skip_exit:&mut walk_skip_exit,
+            // skip_exit:&mut walk_skip_exit,
+            have_exit:&mut walk_have_exit,
         }).or_else(|(e,loc)|Err(WalkError {
             // src:cur.record.src(),
             path:cur.record.path().map(|p|p.to_path_buf()),
@@ -226,8 +233,9 @@ pub fn traverse<'a,E:Debug>(
         //
         if !cur.exit { 
             //push exit
-            if !walk_skip_exit { //skip_exit obviously only works on enter
-                stk.push(Work { 
+            if walk_have_exit // !walk_skip_exit 
+            { //skip_exit obviously only works on enter
+                stk.push(Work {
                     record: cur.record,
                     depth:cur.depth,
                     exit:true, 
