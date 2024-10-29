@@ -196,6 +196,17 @@ impl<'a> RecordContainer<'a> {
      
     }
 
+    pub fn get_child(&self, ind : usize) -> Option<RecordContainer<'a>>  {
+        if self.conf.is_none() {return None;};
+        if self.record().children_text {return None;}
+        if ind>=self.children_num() {return None;}
+
+        Some(Self {
+            conf:self.conf,
+            conf_record_ind :self.record().children.start+ind,
+        })
+     
+    }
     pub fn children_num(&self) -> usize {
         if self.conf.is_none() {return 0;};
 
@@ -218,7 +229,18 @@ impl<'a> RecordContainer<'a> {
             conf_record_ind :parent_record_index,
         }
     }
+    pub fn get_parent(&self) -> Option<RecordContainer<'a>> {
+        if self.conf.is_none() {return Default::default();};
 
+        let Some(parent_record_index)= self.conf.unwrap().records[self.conf_record_ind].parent else {
+            return None;
+        };
+
+        Some(Self{
+            conf:self.conf, 
+            conf_record_ind :parent_record_index,
+        })
+    }
     pub fn has_parent(&self) -> bool {
         if self.conf.is_none() {return false;};
         self.record().parent.is_some()
@@ -242,7 +264,24 @@ impl<'a> RecordContainer<'a> {
 
         Default::default()
     }
+    pub fn get_ancestor(&self, ind : usize) -> Option<RecordContainer<'a>> {
+        if self.conf.is_none() {return None;};
+        if !self.has_parent() {return None;};
 
+        let mut cur = self.parent();
+        let mut j = 0;
+
+        while cur.has_parent() {
+            if j==ind {
+                return Some(cur);
+            } else {
+                cur = cur.parent();
+                j+=1;
+            }
+        }
+
+        None
+    }
     pub fn ancestors(&self) -> AncestorIter<'a> {
         if self.conf.is_none() {return Default::default();};
         let Some(parent)=self.record().parent else {return Default::default()};

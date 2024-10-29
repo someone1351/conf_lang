@@ -61,10 +61,17 @@ impl<'b,'a> Walk<'b,'a> {
     //     self.ancestors.iter().rev()
     // }
     pub fn ancestor(&self,ind:usize) -> RecordContainer<'a> {
-        if self.ancestors.is_empty() {
+        if self.ancestors.is_empty() || ind >=self.ancestors.len() {
             Default::default()
         } else {
             self.ancestors.get(self.ancestors.len()-ind-1).cloned().unwrap()
+        }
+    }
+    pub fn get_ancestor(&self,ind:usize) -> Option<RecordContainer<'a>> {
+        if self.ancestors.is_empty() || ind >=self.ancestors.len() {
+            None
+        } else {
+            Some(self.ancestors.get(self.ancestors.len()-ind-1).cloned().unwrap())
         }
     }
     pub fn parent(&self) -> RecordContainer<'a> {
@@ -72,6 +79,13 @@ impl<'b,'a> Walk<'b,'a> {
             Default::default()
         } else {
             self.ancestors.last().cloned().unwrap()
+        }
+    }
+    pub fn get_parent(&self) -> Option<RecordContainer<'a>> {
+        if self.ancestors.is_empty() {
+            None
+        } else {
+            Some(self.ancestors.last().cloned().unwrap())
         }
     }
     pub fn has_parent(&self) -> bool {
