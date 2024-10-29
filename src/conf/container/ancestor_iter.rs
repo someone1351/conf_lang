@@ -15,9 +15,17 @@ impl<'a> Iterator for AncestorIter<'a> {
         let Some(conf)=self.conf else {return None;};
         let record=conf.records.get(self.conf_record_ind).unwrap();
         
-        record.parent.map(|parent|RecordContainer {
+        let ret=record.parent.map(|parent|RecordContainer {
             conf:Some(conf),
             conf_record_ind:parent,
-        })
+        });
+
+        if let Some(parent)=record.parent {
+            self.conf_record_ind=parent;
+        } else {
+            self.conf=None;
+        }
+
+        ret
     }
 }

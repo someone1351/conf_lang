@@ -284,12 +284,12 @@ impl<'a> RecordContainer<'a> {
     }
     pub fn ancestors(&self) -> AncestorIter<'a> {
         if self.conf.is_none() {return Default::default();};
-        let Some(parent)=self.record().parent else {return Default::default()};
+        // let Some(parent)=self.record().parent else {return Default::default()};
 
         AncestorIter { 
             // record: Some(*self) 
             conf:self.conf,
-            conf_record_ind:parent,
+            conf_record_ind:self.conf_record_ind,
         }
     }
     

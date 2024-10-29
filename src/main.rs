@@ -46,9 +46,11 @@ fn walk_test1() {
     };
 
     let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
-        walk.have_exit();
+        // walk.have_exit();
         let record=walk.record();
         println!("{}",get_record_info(&walk));
+        // println!("===== {:?}",record.ancestors().map(|x|x.tag().unwrap_or_default()).collect::<Vec<_>>());
+        // println!("===== {:?}",record.get_parent().map(|x|x.tag().unwrap_or_default()));
 
         match record.tag() {
             Some("include") if walk.is_enter() => { //include records from another file
@@ -78,14 +80,14 @@ fn walk_test1() {
             }
             Some("hello") if walk.is_enter() => {
                 println!("    {}",get_group_vals_info(record));
-                println!("    the int values are: {}",record.param_group("ints").values().parsed::<i32>().map(|x|format!("{x:?}")).collect::<Vec<_>>().join(", "));
-                println!("    any val is {:?}",record.param_group("the any").value(0).str());
+                // println!("    the int values are: {}",record.param_group("ints").values().parsed::<i32>().map(|x|format!("{x:?}")).collect::<Vec<_>>().join(", "));
+                // println!("    any val is {:?}",record.param_group("the any").value(0).str());
             }
             Some("functest") if walk.is_enter() => {
-                println!("    functest: {:?}",record.values().parsed().collect::<Vec<i32>>());
+                // println!("    functest: {:?}",record.values().parsed().collect::<Vec<i32>>());
             }
             Some("node") if walk.is_enter() => {
-                walk.skip_children();
+                //walk.skip_children();
             }
             _ =>{}
         }
