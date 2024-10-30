@@ -26,6 +26,71 @@ use super::lexer::Loc;
 
 
 
+#[derive(Clone)]
+pub struct WalkFromIter<'b,'a> {
+    pub(super) froms : &'b Vec<RecordContainer<'a>>,
+    pub(super) start : usize,
+    pub(super) end : usize,
+}
+
+
+impl<'b,'a> Iterator for WalkFromIter<'b,'a> {
+    type Item = RecordContainer<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start==self.end {
+            None
+        } else {
+            let ind=self.start;
+            self.start+=1;
+            Some(*self.froms.get(ind).unwrap())
+        }
+    }
+}
+
+impl<'b,'a> DoubleEndedIterator for WalkFromIter<'b,'a> {
+    fn next_back(&mut self) -> Option<RecordContainer<'a>> {
+        if self.end > self.start {
+            self.end-=1;
+            Some(*self.froms.get(self.end).unwrap())
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct WalkAncestorIter<'b,'a> {
+    pub(super) ancestors : &'b Vec<RecordContainer<'a>>,
+    pub(super) start : usize,
+    pub(super) end : usize,
+}
+
+
+impl<'b,'a> Iterator for WalkAncestorIter<'b,'a> {
+    type Item = RecordContainer<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start==self.end {
+            None
+        } else {
+            let ind=self.start;
+            self.start+=1;
+            Some(*self.ancestors.get(ind).unwrap())
+        }
+    }
+}
+
+impl<'b,'a> DoubleEndedIterator for WalkAncestorIter<'b,'a> {
+    fn next_back(&mut self) -> Option<RecordContainer<'a>> {
+        if self.end > self.start {
+            self.end-=1;
+            Some(*self.ancestors.get(self.end).unwrap())
+        } else {
+            None
+        }
+    }
+}
 
 pub struct Walk<'b,'a> {
     record:RecordContainer<'a>,
@@ -35,10 +100,13 @@ pub struct Walk<'b,'a> {
     ancestors : &'b Vec<RecordContainer<'a>>,
 
     skip_children : &'b mut bool,
-    traverse_inserts : &'b mut Vec<RecordContainer<'a>>,
-    traverse_child_inserts : &'b mut Vec<RecordContainer<'a>>,
+    sibling_extends : &'b mut Vec<RecordContainer<'a>>,
+    child_extends : &'b mut Vec<RecordContainer<'a>>,
     // skip_exit : &'b mut bool,
     have_exit : &'b mut bool,
+
+    
+    froms : &'b Vec<RecordContainer<'a>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -60,6 +128,38 @@ impl<'b,'a> Walk<'b,'a> {
     // pub fn ancestors(&self) -> std::slice::Iter<RecordContainer<'a>> {
     //     self.ancestors.iter().rev()
     // }
+
+    pub fn froms_num(&self) -> usize {
+        self.froms.len()
+    }
+
+    pub fn from(&self,ind:usize) -> RecordContainer<'a> {
+        if self.froms.is_empty() || ind >=self.froms.len() {
+            Default::default()
+        } else {
+            self.froms.get(self.froms.len()-ind-1).cloned().unwrap()
+        }
+    }
+    pub fn get_from(&self,ind:usize) -> Option<RecordContainer<'a>> {
+        if self.froms.is_empty() || ind >=self.froms.len() {
+            None
+        } else {
+            Some(self.froms.get(self.froms.len()-ind-1).cloned().unwrap())
+        }
+    }
+
+    pub fn froms(&self) -> WalkFromIter<'b,'a> {
+        WalkFromIter {
+            froms: self.froms,
+            start: 0,
+            end: self.froms.len(),
+        }
+    }
+    
+    pub fn ancestors_num(&self) -> usize {
+        self.ancestors.len()
+    }
+
     pub fn ancestor(&self,ind:usize) -> RecordContainer<'a> {
         if self.ancestors.is_empty() || ind >=self.ancestors.len() {
             Default::default()
@@ -74,6 +174,15 @@ impl<'b,'a> Walk<'b,'a> {
             Some(self.ancestors.get(self.ancestors.len()-ind-1).cloned().unwrap())
         }
     }
+    
+    pub fn ancestors(&self) -> WalkAncestorIter<'b,'a> {
+        WalkAncestorIter {
+            ancestors: self.ancestors,
+            start: 0,
+            end: self.ancestors.len(),
+        }
+    }
+    
     pub fn parent(&self) -> RecordContainer<'a> {
         if self.ancestors.is_empty() {
             Default::default()
@@ -96,32 +205,41 @@ impl<'b,'a> Walk<'b,'a> {
         *self.skip_children=true;
     }
 
-    pub fn insert(&mut self, record : RecordContainer<'a>) {
-        self.traverse_inserts.push(record);
-    }
+    // pub fn insert(&mut self, record : RecordContainer<'a>) {
+    //     self.sibling_inserts.push(record);
+    // }
 
-    pub fn extend<I>(&mut self, records : I) 
-    where
-        I : IntoIterator<Item=RecordContainer<'a>>
-    {
-        self.traverse_inserts.extend(records);
-    }
+    // pub fn extend<I>(&mut self, records : I) 
+    // where
+    //     I : IntoIterator<Item=RecordContainer<'a>>
+    // {
+    //     self.sibling_inserts.extend(records);
+    // }
 
-    pub fn insert_child(&mut self, record : RecordContainer<'a>) {
-        self.traverse_child_inserts.push(record);
-    }
+    // pub fn insert_child(&mut self, record : RecordContainer<'a>) {
+    //     self.child_inserts.push(record);
+    // }
     
-    pub fn extend_children<I>(&mut self, records : I) 
-    where
-        I : IntoIterator<Item=RecordContainer<'a>>
-    {
-        self.traverse_child_inserts.extend(records);
+    // pub fn extend_children<I>(&mut self, records : I) 
+    // where
+    //     I : IntoIterator<Item=RecordContainer<'a>>
+    // {
+    //     self.child_inserts.extend(records);
+    // }
+
+    
+    pub fn extend(&mut self, from_record : RecordContainer<'a>) {
+        self.sibling_extends.push(from_record);
+    }
+
+    pub fn child_extend(&mut self, from_record : RecordContainer<'a>)  {
+        self.child_extends.push(from_record);
     }
 
     // pub fn skip_exit(&mut self) {
     //     *self.skip_exit=true;
     // }
-    
+
     pub fn have_exit(&mut self) {
         *self.have_exit=true;
     }
@@ -135,6 +253,8 @@ struct Work<'a> {
     walk_parent:Option<RecordContainer<'a>>,
     visiteds:HashSet<(Option<&'a Path>, usize)>,
     // include_origin:Option<RecordContainer<'a>>,
+    
+    froms : Vec<RecordContainer<'a>>,
 }
 
 pub fn traverse<'a,E:Debug>(
@@ -142,11 +262,17 @@ pub fn traverse<'a,E:Debug>(
     mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),(E,Option<Loc>)>) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
+    
+    // let mut walk_history=Vec::new();
+    
+
+    // let mut walk_history=Vec::new();
     let mut stk=Vec::new();
     let mut order=0;
 
     {
         let visiteds=HashSet::from([(root_record.path(),root_record.record_index())]);
+
 
         stk.extend(root_record.children().rev().map(|child|{
             Work { 
@@ -157,25 +283,32 @@ pub fn traverse<'a,E:Debug>(
                 walk_parent:None,
                 visiteds:visiteds.clone(),
                 // include_origin:None,
+                froms:Vec::new(),
             }
         }));
     }
 
     //
     while let Some(cur)=stk.pop() {
+        //
+        let mut new_froms=cur.froms.clone();
+        new_froms.push(cur.record);
+
         //walk ancestors
         if cur.depth>0 {
             walk_ancestors.truncate(cur.depth-1);
             walk_ancestors.push(cur.walk_parent.unwrap());
             // println!("== {:?}",cur.walk_parent.map(|x|x.value_str(0)));
         } else {
-            walk_ancestors.clear();
+            // walk_ancestors.clear();
         }
+
+        //handle circular check here?
         
         //
         let mut walk_skip_children=false;
-        let mut walk_traverse_inserts=Vec::new();
-        let mut walk_traverse_child_inserts=Vec::new();
+        let mut walk_sibling_extends=Vec::new();
+        let mut walk_child_extends=Vec::new();
         // let mut walk_skip_exit=false;
         let mut walk_have_exit=false;
 
@@ -187,10 +320,11 @@ pub fn traverse<'a,E:Debug>(
             order:cur.exit.then_some(cur.exit_order).unwrap_or(order),
             ancestors: walk_ancestors.as_ref(),
             skip_children:&mut walk_skip_children,
-            traverse_inserts:&mut walk_traverse_inserts,
-            traverse_child_inserts:&mut walk_traverse_child_inserts,
+            sibling_extends:&mut walk_sibling_extends,
+            child_extends:&mut walk_child_extends,
             // skip_exit:&mut walk_skip_exit,
             have_exit:&mut walk_have_exit,
+            froms:&cur.froms,
         }).or_else(|(e,loc)|Err(WalkError {
             // src:cur.record.src(),
             path:cur.record.path().map(|p|p.to_path_buf()),
@@ -198,11 +332,14 @@ pub fn traverse<'a,E:Debug>(
             error_type: WalkErrorType::Custom(e), 
         }))?;
 
+
+
         //
-        for include_record in walk_traverse_inserts.into_iter().rev() {
-            let x=(include_record.path(),include_record.record_index());
+        for extend_record in walk_sibling_extends.into_iter().rev() {
+            //
+            let visited_key=(extend_record.path(),extend_record.record_index());
             
-            if cur.visiteds.contains(&x) {
+            if cur.visiteds.contains(&visited_key) {
                 return Err(WalkError{
                     // src:cur.record.src(),
                     path:cur.record.path().map(|p|p.to_path_buf()),
@@ -211,22 +348,16 @@ pub fn traverse<'a,E:Debug>(
                 });
             }
 
+            //
             let mut visiteds=cur.visiteds.clone();
-            visiteds.insert(x);
-
-            //push includes
-            // stk.extend(include_record.children().rev().map(|child|Work { 
-            //     record: child,
-            //     depth:cur.depth,
-            //     exit:false,
-            //     exit_order:0,
-            //     walk_parent:cur.walk_parent,
-            //     visiteds:visiteds.clone(),
-            //     // include_origin:Some(cur.record),
-            // }));
+            visiteds.insert(visited_key);
 
             //
-            stk.push(Work { 
+            let mut new_froms=new_froms.clone();
+            new_froms.push(extend_record);
+
+            //
+            stk.extend(extend_record.children().rev().map(|include_record|Work { 
                 record: include_record,
                 depth:cur.depth,
                 exit:false,
@@ -234,7 +365,8 @@ pub fn traverse<'a,E:Debug>(
                 walk_parent:cur.walk_parent,
                 visiteds:visiteds.clone(),
                 // include_origin:Some(cur.record),
-            });
+                froms:new_froms.clone(),
+            }));
         }
 
         //
@@ -257,25 +389,58 @@ pub fn traverse<'a,E:Debug>(
                     walk_parent:cur.walk_parent, 
                     visiteds:cur.visiteds.clone(),
                     // include_origin:cur.include_origin,
+                    froms:cur.froms.clone(),
                 });
             }
         }
 
         //push inserted children, doesn't care about skip_children, and can be inserted on exit
-        stk.extend(walk_traverse_child_inserts.iter().rev().map(|&child|Work { 
-            record: child,
-            depth:cur.depth+1,
-            exit:false,
-            exit_order:0,
-            walk_parent:Some(cur.record),
-            visiteds:cur.visiteds.clone(),
-            // include_origin:None,
-        }));
+        
+        
+        //
+        for extend_record in walk_child_extends.into_iter().rev() {
+            //
+            let visited_key=(extend_record.path(),extend_record.record_index());
+            
+            if cur.visiteds.contains(&visited_key) {
+                return Err(WalkError{
+                    // src:cur.record.src(),
+                    path:cur.record.path().map(|p|p.to_path_buf()),
+                    loc:cur.record.start_loc(),
+                    error_type:WalkErrorType::RecursiveInclude,
+                });
+            }
+
+            //
+            let mut visiteds=cur.visiteds.clone();
+            visiteds.insert(visited_key);
+
+            //
+            let mut new_froms=new_froms.clone();
+            new_froms.push(extend_record);
+
+            //
+            stk.extend(extend_record.children().rev().map(|child|Work { 
+                record: child,
+                depth:cur.depth+1,
+                exit:false,
+                exit_order:0,
+                walk_parent:Some(cur.record),
+                visiteds:cur.visiteds.clone(),
+                // include_origin:None,
+                froms: new_froms.clone(),
+            }));
+        }
 
         //
         if !cur.exit { 
             //push children
             if !walk_skip_children { //only skips on enter, since not visiting children on exit
+
+                let mut new_froms=cur.froms.clone();
+                new_froms.push(cur.record);
+
+                //
                 stk.extend(cur.record.children().rev().map(|child|Work { 
                     record: child,
                     depth:cur.depth+1,
@@ -284,6 +449,7 @@ pub fn traverse<'a,E:Debug>(
                     walk_parent:Some(cur.record),
                     visiteds:cur.visiteds.clone(),
                     // include_origin:None,
+                    froms:new_froms.clone(),
                 }));
             }
 

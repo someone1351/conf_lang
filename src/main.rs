@@ -49,8 +49,11 @@ fn walk_test1() {
         // walk.have_exit();
         let record=walk.record();
         println!("{}",get_record_info(&walk));
-        // println!("===== {:?}",record.ancestors().map(|x|x.tag().unwrap_or_default()).collect::<Vec<_>>());
-        // println!("===== {:?}",record.get_parent().map(|x|x.tag().unwrap_or_default()));
+        // // println!("===== {:?}",record.ancestors().map(|x|x.tag().unwrap_or_default()).collect::<Vec<_>>());
+        // // println!("===== {:?}",record.get_parent().map(|x|x.tag().unwrap_or_default()));
+        // println!("===== {:?} :: {}",walk.froms().map(|x|format!("{} : '{}'",x.tag().unwrap_or("_"),x.values().map(|y|y.str()).collect::<Vec<_>>().join(", "))).collect::<Vec<_>>().join(", "), walk.froms_num());
+        // println!("===== {:?} :: {}",walk.ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.ancestors_num());
+        // println!("===== {:?} :: {}",walk.record().ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.record().ancestors().count());
 
         match record.tag() {
             Some("include") if walk.is_enter() => { //include records from another file
@@ -59,7 +62,8 @@ fn walk_test1() {
                 include_path.push(record.value(0).str());
     
                 return if let Some(conf_data)=confs.get(&include_path) {
-                    walk.extend(conf_data.0.root().children());
+                    walk.extend(conf_data.0.root());
+                    // walk.extend(conf_data.0.root().children());
                     // walk.extend_children(conf_data.0.root().children());
                     
                     // for child in conf_data.0.root().children() {
