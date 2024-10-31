@@ -130,6 +130,9 @@ pub struct Walk<'b,'a> {
 }
 
 impl<'b,'a> Walk<'b,'a> {
+    pub fn error<E:Debug>(&self,e:E) -> WalkError<E> {
+        WalkError { path: self.record().path().map(|p|p.to_path_buf()), loc: self.record().start_loc(), error_type: WalkErrorType::Custom(e) }
+    }
     pub fn record(&self) -> RecordContainer<'a> {
         self.record
     }
@@ -288,7 +291,8 @@ struct Work<'a> {
 pub fn traverse<'a,E:Debug>(
     root_record : RecordContainer<'a>, 
     mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),
-        E //(E,Option<Loc>)
+        // E //(E,Option<Loc>)
+        WalkError<E>
         >,
 ) -> Result<(),WalkError<E>> {
 
@@ -356,14 +360,16 @@ pub fn traverse<'a,E:Debug>(
             // skip_exit:&mut walk_skip_exit,
             have_exit:&mut walk_have_exit,
             froms:&cur.froms,
-        }).or_else(|e //(e,loc)
-            |Err(WalkError {
-            // src:cur.record.src(),
-            path:cur.record.path().map(|p|p.to_path_buf()),
-            // loc: loc.unwrap_or(cur.record.start_loc()), 
-            loc: cur.record.start_loc(), 
-            error_type: WalkErrorType::Custom(e), 
-        }))?;
+        })
+        // .or_else(|e //(e,loc)
+        //     |Err(WalkError {
+        //     // src:cur.record.src(),
+        //     path:cur.record.path().map(|p|p.to_path_buf()),
+        //     // loc: loc.unwrap_or(cur.record.start_loc()), 
+        //     loc: cur.record.start_loc(), 
+        //     error_type: WalkErrorType::Custom(e), 
+        // }))
+        ?;
 
 
 

@@ -79,7 +79,9 @@ fn walk_test1() {
                     // Ok(Some(conf_data.0.root()))
                     Ok(())
                 } else {
-                    Err("include file not found" 
+                    Err(
+                        walk.error("include file not found")
+                        //WalkError::from_record(record, "include file not found" )
                         //("include file not found",Some(record.value(0).start_loc()))
                         )
                 };

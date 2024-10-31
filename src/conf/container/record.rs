@@ -480,7 +480,7 @@ impl<'a> RecordContainer<'a> {
     }
 
     pub fn walk_ext<E:Debug>(&self,callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),
-        E //(E,Option<Loc>)
+        WalkError<E> // E //(E,Option<Loc>)
     >) -> Result<(),WalkError<E>> { //'a,
         if self.conf.is_none() {return Ok(());};
         traverse(*self, callback)

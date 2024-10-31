@@ -1,5 +1,7 @@
 use std::fmt::Debug;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+// use crate::RecordContainer;
 
 use super::super::lexer::Loc;
 use super::super::error_msg;
@@ -20,6 +22,12 @@ pub struct WalkError<E:Debug> { //'a,
 }
 
 impl<E:Debug> WalkError<E> {
+    pub fn new(p : Option<&Path>, loc:Loc, e:E) -> Self {
+        Self { path: p.map(|p|p.to_path_buf()), loc, error_type: WalkErrorType::Custom(e)}
+    }
+    // pub fn from_record(record : RecordContainer, e:E) -> Self {
+    //     Self { path: record.path().map(|p|p.to_path_buf()), loc: record.start_loc(), error_type: WalkErrorType::Custom(e)}
+    // }
     pub fn msg(&self,src:Option<&str>) -> String {
         error_msg(&self.error_type, self.loc, src, self.path.as_ref().map(|p|p.as_path()))
     }
