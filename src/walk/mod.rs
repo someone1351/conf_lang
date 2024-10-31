@@ -6,7 +6,7 @@ use std::{collections::HashSet, fmt::Debug, path::Path};
 use error::{WalkError,WalkErrorType};
 
 use super::conf::container::record::RecordContainer;
-use super::lexer::Loc;
+// use super::lexer::Loc;
 
 //should replace children and values in record with index range into vecs stored in conf
 //walk shouldnt have a single root, rather an array of roots
@@ -287,7 +287,9 @@ struct Work<'a> {
 
 pub fn traverse<'a,E:Debug>(
     root_record : RecordContainer<'a>, 
-    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),(E,Option<Loc>)>,
+    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),
+        E //(E,Option<Loc>)
+        >,
 ) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
@@ -354,10 +356,12 @@ pub fn traverse<'a,E:Debug>(
             // skip_exit:&mut walk_skip_exit,
             have_exit:&mut walk_have_exit,
             froms:&cur.froms,
-        }).or_else(|(e,loc)|Err(WalkError {
+        }).or_else(|e //(e,loc)
+            |Err(WalkError {
             // src:cur.record.src(),
             path:cur.record.path().map(|p|p.to_path_buf()),
-            loc: loc.unwrap_or(cur.record.start_loc()), 
+            // loc: loc.unwrap_or(cur.record.start_loc()), 
+            loc: cur.record.start_loc(), 
             error_type: WalkErrorType::Custom(e), 
         }))?;
 

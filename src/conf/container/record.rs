@@ -479,7 +479,9 @@ impl<'a> RecordContainer<'a> {
         traverse(*self, |w|Ok(callback(w)))
     }
 
-    pub fn walk_ext<E:Debug>(&self,callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),(E,Option<Loc>)>) -> Result<(),WalkError<E>> { //'a,
+    pub fn walk_ext<E:Debug>(&self,callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),
+        E //(E,Option<Loc>)
+    >) -> Result<(),WalkError<E>> { //'a,
         if self.conf.is_none() {return Ok(());};
         traverse(*self, callback)
     }

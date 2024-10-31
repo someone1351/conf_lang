@@ -79,7 +79,9 @@ fn walk_test1() {
                     // Ok(Some(conf_data.0.root()))
                     Ok(())
                 } else {
-                    Err(("include file not found",Some(record.value(0).start_loc())))
+                    Err("include file not found" 
+                        //("include file not found",Some(record.value(0).start_loc()))
+                        )
                 };
             }
             Some("hello") if walk.is_enter() => {
