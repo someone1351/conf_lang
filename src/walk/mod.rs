@@ -1,4 +1,6 @@
 pub mod error;
+use std::any::Any;
+use std::rc::Rc;
 use std::{collections::HashSet, fmt::Debug, path::Path};
 
 use error::{WalkError,WalkErrorType};
@@ -26,16 +28,34 @@ use super::lexer::Loc;
 
 
 
+
+
+
+#[derive(Clone)]
+pub struct WalkFrom<'a> {
+    record:RecordContainer<'a>,
+    custom:Option<Rc<dyn Any>>,
+}
+
+impl<'a> WalkFrom<'a> {
+    pub fn record(&self) -> RecordContainer<'a> {
+        self.record
+    }
+    pub fn custom<T:Any+Clone>(&self) -> Option<T> {
+        self.custom.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+    }
+}
+
 #[derive(Clone)]
 pub struct WalkFromIter<'b,'a> {
-    pub(super) froms : &'b Vec<RecordContainer<'a>>,
+    pub(super) froms : &'b Vec<WalkFrom<'a>>,
     pub(super) start : usize,
     pub(super) end : usize,
 }
 
 
 impl<'b,'a> Iterator for WalkFromIter<'b,'a> {
-    type Item = RecordContainer<'a>;
+    type Item = &'b WalkFrom<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.start==self.end {
@@ -43,16 +63,16 @@ impl<'b,'a> Iterator for WalkFromIter<'b,'a> {
         } else {
             let ind=self.start;
             self.start+=1;
-            Some(*self.froms.get(ind).unwrap())
+            Some(self.froms.get(ind).unwrap())
         }
     }
 }
 
 impl<'b,'a> DoubleEndedIterator for WalkFromIter<'b,'a> {
-    fn next_back(&mut self) -> Option<RecordContainer<'a>> {
+    fn next_back(&mut self) -> Option<&'b WalkFrom<'a>> {
         if self.end > self.start {
             self.end-=1;
-            Some(*self.froms.get(self.end).unwrap())
+            Some(self.froms.get(self.end).unwrap())
         } else {
             None
         }
@@ -100,13 +120,13 @@ pub struct Walk<'b,'a> {
     ancestors : &'b Vec<RecordContainer<'a>>,
 
     skip_children : &'b mut bool,
-    sibling_extends : &'b mut Vec<RecordContainer<'a>>,
-    child_extends : &'b mut Vec<RecordContainer<'a>>,
+    sibling_extends : &'b mut Vec<WalkFrom<'a>>,
+    child_extends : &'b mut Vec<WalkFrom<'a>>,
     // skip_exit : &'b mut bool,
     have_exit : &'b mut bool,
 
     
-    froms : &'b Vec<RecordContainer<'a>>,
+    froms : &'b Vec<WalkFrom<'a>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -133,18 +153,18 @@ impl<'b,'a> Walk<'b,'a> {
         self.froms.len()
     }
 
-    pub fn from(&self,ind:usize) -> RecordContainer<'a> {
-        if self.froms.is_empty() || ind >=self.froms.len() {
-            Default::default()
-        } else {
-            self.froms.get(self.froms.len()-ind-1).cloned().unwrap()
-        }
-    }
-    pub fn get_from(&self,ind:usize) -> Option<RecordContainer<'a>> {
+    // pub fn from(&self,ind:usize) -> RecordContainer<'a> {
+    //     if self.froms.is_empty() || ind >=self.froms.len() {
+    //         Default::default()
+    //     } else {
+    //         self.froms.get(self.froms.len()-ind-1).cloned().unwrap()
+    //     }
+    // }
+    pub fn get_from(&self,ind:usize) -> Option<&'b WalkFrom<'a>> {
         if self.froms.is_empty() || ind >=self.froms.len() {
             None
         } else {
-            Some(self.froms.get(self.froms.len()-ind-1).cloned().unwrap())
+            Some(self.froms.get(self.froms.len()-ind-1).unwrap()) //.cloned()
         }
     }
 
@@ -229,11 +249,19 @@ impl<'b,'a> Walk<'b,'a> {
 
     
     pub fn extend(&mut self, from_record : RecordContainer<'a>) {
-        self.sibling_extends.push(from_record);
+        self.sibling_extends.push(WalkFrom { record: from_record, custom: None });
     }
 
-    pub fn child_extend(&mut self, from_record : RecordContainer<'a>)  {
-        self.child_extends.push(from_record);
+    pub fn extend_children(&mut self, from_record : RecordContainer<'a>)  {
+        self.child_extends.push(WalkFrom { record: from_record, custom: None });
+    }
+
+    pub fn extend_custom<T:Any>(&mut self, from_record : RecordContainer<'a>, custom:T) {
+        self.sibling_extends.push(WalkFrom { record: from_record, custom: Some(Rc::new(custom)) });
+    }
+
+    pub fn extend_children_custom<T:Any>(&mut self, from_record : RecordContainer<'a>, custom:T)  {
+        self.child_extends.push(WalkFrom { record: from_record, custom: Some(Rc::new(custom)) });
     }
 
     // pub fn skip_exit(&mut self) {
@@ -254,12 +282,13 @@ struct Work<'a> {
     visiteds:HashSet<(Option<&'a Path>, usize)>,
     // include_origin:Option<RecordContainer<'a>>,
     
-    froms : Vec<RecordContainer<'a>>,
+    froms : Vec<WalkFrom<'a>>,
 }
 
 pub fn traverse<'a,E:Debug>(
     root_record : RecordContainer<'a>, 
-    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),(E,Option<Loc>)>) -> Result<(),WalkError<E>> {
+    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),(E,Option<Loc>)>,
+) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
     
@@ -292,7 +321,7 @@ pub fn traverse<'a,E:Debug>(
     while let Some(cur)=stk.pop() {
         //
         let mut new_froms=cur.froms.clone();
-        new_froms.push(cur.record);
+        new_froms.push(WalkFrom{ record: cur.record, custom: None });
 
         //walk ancestors
         if cur.depth>0 {
@@ -335,9 +364,9 @@ pub fn traverse<'a,E:Debug>(
 
 
         //
-        for extend_record in walk_sibling_extends.into_iter().rev() {
+        for extend_from in walk_sibling_extends.into_iter().rev() {
             //
-            let visited_key=(extend_record.path(),extend_record.record_index());
+            let visited_key=(extend_from.record().path(),extend_from.record().record_index());
             
             if cur.visiteds.contains(&visited_key) {
                 return Err(WalkError{
@@ -354,10 +383,10 @@ pub fn traverse<'a,E:Debug>(
 
             //
             let mut new_froms=new_froms.clone();
-            new_froms.push(extend_record);
+            new_froms.push(extend_from.clone());
 
             //
-            stk.extend(extend_record.children().rev().map(|include_record|Work { 
+            stk.extend(extend_from.record().children().rev().map(|include_record|Work { 
                 record: include_record,
                 depth:cur.depth,
                 exit:false,
@@ -398,9 +427,9 @@ pub fn traverse<'a,E:Debug>(
         
         
         //
-        for extend_record in walk_child_extends.into_iter().rev() {
+        for extend_from in walk_child_extends.into_iter().rev() {
             //
-            let visited_key=(extend_record.path(),extend_record.record_index());
+            let visited_key=(extend_from.record().path(),extend_from.record().record_index());
             
             if cur.visiteds.contains(&visited_key) {
                 return Err(WalkError{
@@ -417,10 +446,10 @@ pub fn traverse<'a,E:Debug>(
 
             //
             let mut new_froms=new_froms.clone();
-            new_froms.push(extend_record);
+            new_froms.push(extend_from.clone());
 
             //
-            stk.extend(extend_record.children().rev().map(|child|Work { 
+            stk.extend(extend_from.record().children().rev().map(|child|Work { 
                 record: child,
                 depth:cur.depth+1,
                 exit:false,
@@ -438,7 +467,7 @@ pub fn traverse<'a,E:Debug>(
             if !walk_skip_children { //only skips on enter, since not visiting children on exit
 
                 let mut new_froms=cur.froms.clone();
-                new_froms.push(cur.record);
+                new_froms.push(WalkFrom { record: cur.record, custom: None });
 
                 //
                 stk.extend(cur.record.children().rev().map(|child|Work { 
