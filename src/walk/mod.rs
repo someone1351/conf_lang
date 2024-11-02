@@ -127,6 +127,8 @@ pub struct Walk<'b,'a> {
 
     
     froms : &'b Vec<WalkFrom<'a>>,
+
+    cur_from_custom : &'b mut Option<Rc<dyn Any>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -267,6 +269,10 @@ impl<'b,'a> Walk<'b,'a> {
         self.child_extends.push(WalkFrom { record: from_record, custom: Some(Rc::new(custom)) });
     }
 
+    pub fn set_from_custom<T:Any>(&mut self, custom:T) {
+        *self.cur_from_custom=Some(Rc::new(custom));
+
+    }
     // pub fn skip_exit(&mut self) {
     //     *self.skip_exit=true;
     // }
@@ -325,10 +331,6 @@ pub fn traverse<'a,E:Debug>(
 
     //
     while let Some(cur)=stk.pop() {
-        //
-        let mut new_froms=cur.froms.clone();
-        new_froms.push(WalkFrom{ record: cur.record, custom: None });
-
         //walk ancestors
         if cur.depth>0 {
             walk_ancestors.truncate(cur.depth-1);
@@ -346,6 +348,7 @@ pub fn traverse<'a,E:Debug>(
         let mut walk_child_extends=Vec::new();
         // let mut walk_skip_exit=false;
         let mut walk_have_exit=false;
+        let mut walk_cur_from_custom=None;
 
         //
         callback(Walk { 
@@ -360,6 +363,7 @@ pub fn traverse<'a,E:Debug>(
             // skip_exit:&mut walk_skip_exit,
             have_exit:&mut walk_have_exit,
             froms:&cur.froms,
+            cur_from_custom: &mut walk_cur_from_custom,
         })
         // .or_else(|e //(e,loc)
         //     |Err(WalkError {
@@ -370,6 +374,10 @@ pub fn traverse<'a,E:Debug>(
         //     error_type: WalkErrorType::Custom(e), 
         // }))
         ?;
+
+        //
+        let mut new_froms=cur.froms.clone();
+        new_froms.push(WalkFrom{ record: cur.record, custom: walk_cur_from_custom });
 
 
 
@@ -476,8 +484,8 @@ pub fn traverse<'a,E:Debug>(
             //push children
             if !walk_skip_children { //only skips on enter, since not visiting children on exit
 
-                let mut new_froms=cur.froms.clone();
-                new_froms.push(WalkFrom { record: cur.record, custom: None });
+                // let mut new_froms=cur.froms.clone();
+                // new_froms.push(WalkFrom { record: cur.record, custom: None });
 
                 //
                 stk.extend(cur.record.children().rev().map(|child|Work { 
@@ -489,6 +497,7 @@ pub fn traverse<'a,E:Debug>(
                     visiteds:cur.visiteds.clone(),
                     // include_origin:None,
                     froms:new_froms.clone(),
+                    // froms:cur.froms.clone(),
                 }));
             }
 
