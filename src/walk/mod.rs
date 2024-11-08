@@ -28,86 +28,65 @@ use super::conf::container::record::RecordContainer;
 
 
 
-
-
-
-#[derive(Clone)]
-pub struct WalkFrom<'a> {
+#[derive(Clone,Default)]
+pub struct Bla<'a> {
     record:RecordContainer<'a>,
-    custom:Option<Rc<dyn Any>>,
+    note:Option<Rc<dyn Any>>,
 }
 
-impl<'a> WalkFrom<'a> {
+
+#[derive(Clone,Default)]
+pub struct WalkAncestor<'a> {
+    record:RecordContainer<'a>,
+    note:Option<Rc<dyn Any>>,
+    depth:usize,
+    order:usize,
+}
+
+impl<'a> WalkAncestor<'a> {
     pub fn record(&self) -> RecordContainer<'a> {
         self.record
     }
-    pub fn custom<T:Any+Clone>(&self) -> Option<T> {
-        self.custom.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+    pub fn note<T:Any+Clone>(&self) -> Option<T> {
+        self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
     }
-}
-
-#[derive(Clone)]
-pub struct WalkFromIter<'b,'a> {
-    pub(super) froms : &'b Vec<WalkFrom<'a>>,
-    pub(super) start : usize,
-    pub(super) end : usize,
-}
-
-
-impl<'b,'a> Iterator for WalkFromIter<'b,'a> {
-    type Item = &'b WalkFrom<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.start==self.end {
-            None
-        } else {
-            let ind=self.start;
-            self.start+=1;
-            Some(self.froms.get(ind).unwrap())
-        }
+    pub fn depth(&self) -> usize {
+        self.depth
     }
-}
-
-impl<'b,'a> DoubleEndedIterator for WalkFromIter<'b,'a> {
-    fn next_back(&mut self) -> Option<&'b WalkFrom<'a>> {
-        if self.end > self.start {
-            self.end-=1;
-            Some(self.froms.get(self.end).unwrap())
-        } else {
-            None
-        }
+    pub fn order(&self) -> usize {
+        self.order
     }
 }
 
 #[derive(Clone)]
 pub struct WalkAncestorIter<'b,'a> {
-    pub(super) ancestors : &'b Vec<RecordContainer<'a>>,
+    pub(super) ancestors : &'b Vec<WalkAncestor<'a>>,
     pub(super) start : usize,
     pub(super) end : usize,
 }
 
-
 impl<'b,'a> Iterator for WalkAncestorIter<'b,'a> {
-    type Item = RecordContainer<'a>;
+    type Item = &'b WalkAncestor<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.start==self.end {
+        if self.start>=self.end {
             None
         } else {
-            let ind=self.start;
+            let ind=self.ancestors.len()-self.start-1;
             self.start+=1;
-            Some(*self.ancestors.get(ind).unwrap())
+            Some(self.ancestors.get(ind).unwrap())
         }
     }
 }
 
 impl<'b,'a> DoubleEndedIterator for WalkAncestorIter<'b,'a> {
-    fn next_back(&mut self) -> Option<RecordContainer<'a>> {
-        if self.end > self.start {
-            self.end-=1;
-            Some(*self.ancestors.get(self.end).unwrap())
-        } else {
+    fn next_back(&mut self) -> Option<&'b WalkAncestor<'a>> {
+        if self.start>=self.end {
             None
+        } else {
+            self.end-=1;
+            let ind=self.ancestors.len()-self.end-1;
+            Some(self.ancestors.get(ind).unwrap())
         }
     }
 }
@@ -117,82 +96,53 @@ pub struct Walk<'b,'a> {
     depth:usize,
     order:usize,
     exit:bool,
-    ancestors : &'b Vec<RecordContainer<'a>>,
-
+    ancestors : &'b Vec<WalkAncestor<'a>>,
     skip_children : &'b mut bool,
-    sibling_extends : &'b mut Vec<WalkFrom<'a>>,
-    child_extends : &'b mut Vec<WalkFrom<'a>>,
-    // skip_exit : &'b mut bool,
+    // sibling_inserts : &'b mut Vec<Bla<'a>>,
+    // child_inserts : &'b mut Vec<Bla<'a>>,
+    sibling_inserts : &'b mut Vec<(RecordContainer<'a>,Option<Rc<dyn Any>>)>,
+    child_inserts : &'b mut Vec<(RecordContainer<'a>,Option<Rc<dyn Any>>)>,
     have_exit : &'b mut bool,
-
-    
-    froms : &'b Vec<WalkFrom<'a>>,
-
-    cur_from_custom : &'b mut Option<Rc<dyn Any>>,
+    cur_note : &'b mut Option<Rc<dyn Any>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
     pub fn error<E:Debug>(&self,e:E) -> WalkError<E> {
         WalkError { path: self.record().path().map(|p|p.to_path_buf()), loc: self.record().start_loc(), error_type: WalkErrorType::Custom(e) }
     }
+
     pub fn record(&self) -> RecordContainer<'a> {
         self.record
     }
+
     pub fn depth(&self) -> usize {
         self.depth
     }
+
     pub fn order(&self) -> usize {
         self.order
     }
+
     pub fn is_enter(&self) -> bool {
         !self.exit
     }
+
     pub fn is_exit(&self) -> bool {
         self.exit
     }
-    // pub fn ancestors(&self) -> std::slice::Iter<RecordContainer<'a>> {
-    //     self.ancestors.iter().rev()
-    // }
 
-    pub fn froms_num(&self) -> usize {
-        self.froms.len()
-    }
-
-    // pub fn from(&self,ind:usize) -> RecordContainer<'a> {
-    //     if self.froms.is_empty() || ind >=self.froms.len() {
-    //         Default::default()
-    //     } else {
-    //         self.froms.get(self.froms.len()-ind-1).cloned().unwrap()
-    //     }
-    // }
-    pub fn get_from(&self,ind:usize) -> Option<&'b WalkFrom<'a>> {
-        if self.froms.is_empty() || ind >=self.froms.len() {
-            None
-        } else {
-            Some(self.froms.get(self.froms.len()-ind-1).unwrap()) //.cloned()
-        }
-    }
-
-    pub fn froms(&self) -> WalkFromIter<'b,'a> {
-        WalkFromIter {
-            froms: self.froms,
-            start: 0,
-            end: self.froms.len(),
-        }
-    }
-    
     pub fn ancestors_num(&self) -> usize {
         self.ancestors.len()
     }
 
-    pub fn ancestor(&self,ind:usize) -> RecordContainer<'a> {
+    pub fn ancestor(&self,ind:usize) -> WalkAncestor<'a> {
         if self.ancestors.is_empty() || ind >=self.ancestors.len() {
             Default::default()
         } else {
             self.ancestors.get(self.ancestors.len()-ind-1).cloned().unwrap()
         }
     }
-    pub fn get_ancestor(&self,ind:usize) -> Option<RecordContainer<'a>> {
+    pub fn get_ancestor(&self,ind:usize) -> Option<WalkAncestor<'a>> {
         if self.ancestors.is_empty() || ind >=self.ancestors.len() {
             None
         } else {
@@ -208,20 +158,18 @@ impl<'b,'a> Walk<'b,'a> {
         }
     }
     
-    pub fn parent(&self) -> RecordContainer<'a> {
-        if self.ancestors.is_empty() {
-            Default::default()
-        } else {
-            self.ancestors.last().cloned().unwrap()
-        }
+    pub fn parent(&self) -> WalkAncestor<'a> {
+        self.ancestors.last().cloned().unwrap_or_default()
     }
-    pub fn get_parent(&self) -> Option<RecordContainer<'a>> {
+
+    pub fn get_parent(&self) -> Option<WalkAncestor<'a>> {
         if self.ancestors.is_empty() {
             None
         } else {
             Some(self.ancestors.last().cloned().unwrap())
         }
     }
+
     pub fn has_parent(&self) -> bool {
         !self.ancestors.is_empty()
     }
@@ -230,52 +178,47 @@ impl<'b,'a> Walk<'b,'a> {
         *self.skip_children=true;
     }
 
-    // pub fn insert(&mut self, record : RecordContainer<'a>) {
-    //     self.sibling_inserts.push(record);
-    // }
-
-    // pub fn extend<I>(&mut self, records : I) 
-    // where
-    //     I : IntoIterator<Item=RecordContainer<'a>>
-    // {
-    //     self.sibling_inserts.extend(records);
-    // }
-
-    // pub fn insert_child(&mut self, record : RecordContainer<'a>) {
-    //     self.child_inserts.push(record);
-    // }
-    
-    // pub fn extend_children<I>(&mut self, records : I) 
-    // where
-    //     I : IntoIterator<Item=RecordContainer<'a>>
-    // {
-    //     self.child_inserts.extend(records);
-    // }
-
-    
-    pub fn extend(&mut self, from_record : RecordContainer<'a>) {
-        self.sibling_extends.push(WalkFrom { record: from_record, custom: None });
+    pub fn extend<I>(&mut self, records : I) 
+    where
+        I : IntoIterator<Item=RecordContainer<'a>>
+    {
+        self.sibling_inserts.extend(records.into_iter().map(|x|(x,None)));
     }
 
-    pub fn extend_children(&mut self, from_record : RecordContainer<'a>)  {
-        self.child_extends.push(WalkFrom { record: from_record, custom: None });
+    pub fn extend_children<I>(&mut self, records : I) 
+    where
+        I : IntoIterator<Item=RecordContainer<'a>>
+    {
+        self.child_inserts.extend(records.into_iter().map(|x|(x,None)));
     }
 
-    pub fn extend_custom<T:Any>(&mut self, from_record : RecordContainer<'a>, custom:T) {
-        self.sibling_extends.push(WalkFrom { record: from_record, custom: Some(Rc::new(custom)) });
+    pub fn extend_note<I,T:Any>(&mut self, records : I, note:T) 
+    where
+        I : IntoIterator<Item=RecordContainer<'a>>
+    {
+        // let note=Some(Rc::new(note));
+        // self.sibling_inserts.push(Bla{ record: self.record(), note: Some(Rc::new(note))});
+        // self.sibling_inserts.push(( self.record(),  Some(Rc::new(note))));
+        // self.sibling_inserts.extend(records.into_iter().map(|x|Bla{ record: x, note: note.clone()}));
+
+        let note=Some(Rc::new(note));
+        for record in records {
+            self.sibling_inserts.push(( record,  note.clone()));
+
+        }
     }
 
-    pub fn extend_children_custom<T:Any>(&mut self, from_record : RecordContainer<'a>, custom:T)  {
-        self.child_extends.push(WalkFrom { record: from_record, custom: Some(Rc::new(custom)) });
+    pub fn extend_children_note<I,T:Any>(&mut self, records : I, note:T) 
+    where
+        I : IntoIterator<Item=RecordContainer<'a>>
+    {
+        let note=Some(Rc::new(note));
+        // self.child_inserts.extend(records.into_iter().map(|x|(x,note.clone())));
     }
 
-    pub fn set_from_custom<T:Any>(&mut self, custom:T) {
-        *self.cur_from_custom=Some(Rc::new(custom));
-
+    pub fn set_note<T:Any>(&mut self, note:T) {
+        *self.cur_note=Some(Rc::new(note));
     }
-    // pub fn skip_exit(&mut self) {
-    //     *self.skip_exit=true;
-    // }
 
     pub fn have_exit(&mut self) {
         *self.have_exit=true;
@@ -287,33 +230,20 @@ struct Work<'a> {
     depth:usize,
     exit:bool,
     exit_order:usize,
-    walk_parent:Option<RecordContainer<'a>>,
     visiteds:HashSet<(Option<&'a Path>, usize)>,
-    // include_origin:Option<RecordContainer<'a>>,
-    
-    froms : Vec<WalkFrom<'a>>,
 }
 
 pub fn traverse<'a,E:Debug>(
     root_record : RecordContainer<'a>, 
-    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),
-        // E //(E,Option<Loc>)
-        WalkError<E>
-        >,
+    mut callback : impl for<'b> FnMut(Walk<'b,'a>) -> Result<(),WalkError<E>>,
 ) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
-    
-    // let mut walk_history=Vec::new();
-    
-
-    // let mut walk_history=Vec::new();
     let mut stk=Vec::new();
     let mut order=0;
 
     {
         let visiteds=HashSet::from([(root_record.path(),root_record.record_index())]);
-
 
         stk.extend(root_record.children().rev().map(|child|{
             Work { 
@@ -321,99 +251,77 @@ pub fn traverse<'a,E:Debug>(
                 depth:0,
                 exit:false,
                 exit_order:0,
-                walk_parent:None,
                 visiteds:visiteds.clone(),
-                // include_origin:None,
-                froms:Vec::new(),
             }
         }));
     }
 
     //
-    while let Some(cur)=stk.pop() {
+    while let Some(cur_work)=stk.pop() {
         //walk ancestors
-        if cur.depth>0 {
-            walk_ancestors.truncate(cur.depth-1);
-            walk_ancestors.push(cur.walk_parent.unwrap());
-            // println!("== {:?}",cur.walk_parent.map(|x|x.value_str(0)));
-        } else {
-            // walk_ancestors.clear();
-        }
+        //  the +1 makes it not remove cur node inserted during enter
+        //  should note be kept from enter for the exit? 
+        // walk_ancestors.truncate(cur_work.depth+cur_work.exit.then_some(1).unwrap_or(0));
+
+        walk_ancestors.truncate(cur_work.depth);
 
         //handle circular check here?
         
         //
         let mut walk_skip_children=false;
-        let mut walk_sibling_extends=Vec::new();
-        let mut walk_child_extends=Vec::new();
-        // let mut walk_skip_exit=false;
+        let mut walk_sibling_inserts=Vec::new();
+        let mut walk_child_inserts=Vec::new();
         let mut walk_have_exit=false;
-        let mut walk_cur_from_custom=None;
+        let mut walk_cur_note=None;
+
+        //
+        let cur_order=cur_work.exit.then_some(cur_work.exit_order).unwrap_or(order);
 
         //
         callback(Walk { 
-            record: cur.record, 
-            depth: cur.depth, 
-            exit: cur.exit, 
-            order:cur.exit.then_some(cur.exit_order).unwrap_or(order),
+            record: cur_work.record, 
+            depth: cur_work.depth, 
+            exit: cur_work.exit, 
+            order:cur_order,
             ancestors: walk_ancestors.as_ref(),
-            skip_children:&mut walk_skip_children,
-            sibling_extends:&mut walk_sibling_extends,
-            child_extends:&mut walk_child_extends,
-            // skip_exit:&mut walk_skip_exit,
+            skip_children:&mut walk_skip_children,            
+            sibling_inserts:&mut walk_sibling_inserts,
+            child_inserts:&mut walk_child_inserts,
             have_exit:&mut walk_have_exit,
-            froms:&cur.froms,
-            cur_from_custom: &mut walk_cur_from_custom,
-        })
-        // .or_else(|e //(e,loc)
-        //     |Err(WalkError {
-        //     // src:cur.record.src(),
-        //     path:cur.record.path().map(|p|p.to_path_buf()),
-        //     // loc: loc.unwrap_or(cur.record.start_loc()), 
-        //     loc: cur.record.start_loc(), 
-        //     error_type: WalkErrorType::Custom(e), 
-        // }))
-        ?;
+            cur_note: &mut walk_cur_note,
+        })?;
 
         //
-        let mut new_froms=cur.froms.clone();
-        new_froms.push(WalkFrom{ record: cur.record, custom: walk_cur_from_custom });
-
-
+        //note set on entry is lost on exit? yes
+        // if !cur_work.exit {
+        walk_ancestors.push(WalkAncestor { record: cur_work.record, note: walk_cur_note.clone(), depth: cur_work.depth, order:cur_order });
+        // }
 
         //
-        for extend_from in walk_sibling_extends.into_iter().rev() {
+        for (include_record, include_note) in walk_sibling_inserts.into_iter().rev() {
             //
-            let visited_key=(extend_from.record().path(),extend_from.record().record_index());
+            let visited_key=(include_record.path(),include_record.record_index());
             
-            if cur.visiteds.contains(&visited_key) {
+            if cur_work.visiteds.contains(&visited_key) {
                 return Err(WalkError{
-                    // src:cur.record.src(),
-                    path:cur.record.path().map(|p|p.to_path_buf()),
-                    loc:cur.record.start_loc(),
+                    path:cur_work.record.path().map(|p|p.to_path_buf()),
+                    loc:cur_work.record.start_loc(),
                     error_type:WalkErrorType::RecursiveInclude,
                 });
             }
 
             //
-            let mut visiteds=cur.visiteds.clone();
+            let mut visiteds=cur_work.visiteds.clone();
             visiteds.insert(visited_key);
 
             //
-            let mut new_froms=new_froms.clone();
-            new_froms.push(extend_from.clone());
-
-            //
-            stk.extend(extend_from.record().children().rev().map(|include_record|Work { 
+            stk.push(Work { 
                 record: include_record,
-                depth:cur.depth,
+                depth:cur_work.depth,
                 exit:false,
                 exit_order:0,
-                walk_parent:cur.walk_parent,
                 visiteds:visiteds.clone(),
-                // include_origin:Some(cur.record),
-                froms:new_froms.clone(),
-            }));
+            });
         }
 
         //
@@ -424,80 +332,56 @@ pub fn traverse<'a,E:Debug>(
         //on exit add: includes, insert children,
 
         //
-        if !cur.exit { 
+        if !cur_work.exit { 
             //push exit
             if walk_have_exit // !walk_skip_exit 
             { //skip_exit obviously only works on enter
                 stk.push(Work {
-                    record: cur.record,
-                    depth:cur.depth,
+                    record: cur_work.record,
+                    depth:cur_work.depth,
                     exit:true, 
                     exit_order:order,
-                    walk_parent:cur.walk_parent, 
-                    visiteds:cur.visiteds.clone(),
-                    // include_origin:cur.include_origin,
-                    froms:cur.froms.clone(),
+                    visiteds:cur_work.visiteds.clone(),
                 });
             }
         }
 
-        //push inserted children, doesn't care about skip_children, and can be inserted on exit
-        
-        
         //
-        for extend_from in walk_child_extends.into_iter().rev() {
-            //
-            let visited_key=(extend_from.record().path(),extend_from.record().record_index());
+        for (child_record,child_note) in walk_child_inserts.into_iter().rev() {
+            let visited_key=(child_record.path(),child_record.record_index());
             
-            if cur.visiteds.contains(&visited_key) {
+            if cur_work.visiteds.contains(&visited_key) {
                 return Err(WalkError{
-                    // src:cur.record.src(),
-                    path:cur.record.path().map(|p|p.to_path_buf()),
-                    loc:cur.record.start_loc(),
+                    path:cur_work.record.path().map(|p|p.to_path_buf()),
+                    loc:cur_work.record.start_loc(),
                     error_type:WalkErrorType::RecursiveInclude,
                 });
             }
 
             //
-            let mut visiteds=cur.visiteds.clone();
+            let mut visiteds=cur_work.visiteds.clone();
             visiteds.insert(visited_key);
 
             //
-            let mut new_froms=new_froms.clone();
-            new_froms.push(extend_from.clone());
-
-            //
-            stk.extend(extend_from.record().children().rev().map(|child|Work { 
-                record: child,
-                depth:cur.depth+1,
+            stk.push(Work { 
+                record: child_record,
+                depth:cur_work.depth+1,
                 exit:false,
                 exit_order:0,
-                walk_parent:Some(cur.record),
-                visiteds:cur.visiteds.clone(),
-                // include_origin:None,
-                froms: new_froms.clone(),
-            }));
+                visiteds:cur_work.visiteds.clone(),
+            });
         }
 
         //
-        if !cur.exit { 
+        if !cur_work.exit { 
             //push children
             if !walk_skip_children { //only skips on enter, since not visiting children on exit
-
-                // let mut new_froms=cur.froms.clone();
-                // new_froms.push(WalkFrom { record: cur.record, custom: None });
-
-                //
-                stk.extend(cur.record.children().rev().map(|child|Work { 
+                stk.extend(cur_work.record.children().rev().map(|child|Work { 
                     record: child,
-                    depth:cur.depth+1,
+                    depth:cur_work.depth+1,
                     exit:false,
                     exit_order:0,
-                    walk_parent:Some(cur.record),
-                    visiteds:cur.visiteds.clone(),
-                    // include_origin:None,
-                    froms:new_froms.clone(),
-                    // froms:cur.froms.clone(),
+                    visiteds:cur_work.visiteds.clone(),
                 }));
             }
 
