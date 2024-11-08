@@ -57,7 +57,7 @@ fn walk_test1() {
         println!("===== {} ::: {}",walk.ancestors().map(|x|format!("{}.'{}';{:?}",
             x.record().tag().unwrap_or("_"),
             x.record().values().map(|y|y.str()).collect::<Vec<_>>().join(", "),
-            x.note::<String>(),
+            x.get_note::<String>(),
         )).collect::<Vec<_>>().join(", "), walk.ancestors_num());
 
         // println!("===== {:?} :: {}",walk.ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.ancestors_num());

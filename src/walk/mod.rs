@@ -28,12 +28,6 @@ use super::conf::container::record::RecordContainer;
 
 
 
-#[derive(Clone,Default)]
-pub struct Bla<'a> {
-    record:RecordContainer<'a>,
-    note:Option<Rc<dyn Any>>,
-}
-
 
 #[derive(Clone,Default)]
 pub struct WalkAncestor<'a> {
@@ -47,7 +41,7 @@ impl<'a> WalkAncestor<'a> {
     pub fn record(&self) -> RecordContainer<'a> {
         self.record
     }
-    pub fn note<T:Any+Clone>(&self) -> Option<T> {
+    pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
         self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
     }
     pub fn depth(&self) -> usize {
@@ -196,30 +190,24 @@ impl<'b,'a> Walk<'b,'a> {
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {
-        // let note=Some(Rc::new(note));
-        // self.sibling_inserts.push(Bla{ record: self.record(), note: Some(Rc::new(note))});
-        // self.sibling_inserts.push(( self.record(),  Some(Rc::new(note))));
-        // self.sibling_inserts.extend(records.into_iter().map(|x|Bla{ record: x, note: note.clone()}));
-
-        let note=Some(Rc::new(note));
-        for record in records {
-            self.sibling_inserts.push(( record,  note.clone()));
-
-        }
+        let note:Option<Rc<(dyn Any)>>=Some(Rc::new(note));
+        self.sibling_inserts.extend(records.into_iter().map(|x|(x, note.clone())));
     }
 
     pub fn extend_children_note<I,T:Any>(&mut self, records : I, note:T) 
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {
-        let note=Some(Rc::new(note));
-        // self.child_inserts.extend(records.into_iter().map(|x|(x,note.clone())));
+        let note:Option<Rc<(dyn Any)>>=Some(Rc::new(note));
+        self.child_inserts.extend(records.into_iter().map(|x|(x,note.clone())));
     }
 
     pub fn set_note<T:Any>(&mut self, note:T) {
         *self.cur_note=Some(Rc::new(note));
     }
-
+    pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
+        self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+    }
     pub fn have_exit(&mut self) {
         *self.have_exit=true;
     }
@@ -231,6 +219,7 @@ struct Work<'a> {
     exit:bool,
     exit_order:usize,
     visiteds:HashSet<(Option<&'a Path>, usize)>,
+    note : Option<Rc<dyn Any>>,
 }
 
 pub fn traverse<'a,E:Debug>(
@@ -252,6 +241,7 @@ pub fn traverse<'a,E:Debug>(
                 exit:false,
                 exit_order:0,
                 visiteds:visiteds.clone(),
+                note : None,
             }
         }));
     }
@@ -272,7 +262,7 @@ pub fn traverse<'a,E:Debug>(
         let mut walk_sibling_inserts=Vec::new();
         let mut walk_child_inserts=Vec::new();
         let mut walk_have_exit=false;
-        let mut walk_cur_note=None;
+        let mut walk_cur_note=cur_work.note.clone();
 
         //
         let cur_order=cur_work.exit.then_some(cur_work.exit_order).unwrap_or(order);
@@ -321,6 +311,7 @@ pub fn traverse<'a,E:Debug>(
                 exit:false,
                 exit_order:0,
                 visiteds:visiteds.clone(),
+                note : include_note.clone(),
             });
         }
 
@@ -342,6 +333,7 @@ pub fn traverse<'a,E:Debug>(
                     exit:true, 
                     exit_order:order,
                     visiteds:cur_work.visiteds.clone(),
+                    note : walk_cur_note.clone(),
                 });
             }
         }
@@ -369,6 +361,7 @@ pub fn traverse<'a,E:Debug>(
                 exit:false,
                 exit_order:0,
                 visiteds:cur_work.visiteds.clone(),
+                note : child_note.clone(),
             });
         }
 
@@ -382,6 +375,7 @@ pub fn traverse<'a,E:Debug>(
                     exit:false,
                     exit_order:0,
                     visiteds:cur_work.visiteds.clone(),
+                    note : None,
                 }));
             }
 
