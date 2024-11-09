@@ -1429,7 +1429,6 @@ fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
     if lexer.has(0, ["#!"]).is_none() {
         lexer.pop_discard();
         lexer.debug_label_pop();
-        println!("hmm start");
         return false;
     }
 
@@ -1445,7 +1444,6 @@ fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
     if lexer.has(0, ["!#"]).is_none() {
         lexer.pop_discard();
         lexer.debug_label_pop();
-        println!("hmm end");
         return false;
     }
 
@@ -1455,7 +1453,6 @@ fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
     if !parse_ending(lexer) {
         lexer.pop_discard();
         lexer.debug_label_pop();
-        println!("hmm end2");
         return false;
     }
 
@@ -1463,6 +1460,5 @@ fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
     lexer.pop_keep();
     lexer.debug_label_pop();
     
-    println!("hmm ok");
     true
 }
