@@ -1,23 +1,5 @@
 //if .group() not used, don't have any stored in record.param_group()
 
-use std::any::{Any, TypeId};
-use std::collections::{HashMap, HashSet};
-use std::ops::Range;
-use std::path::Path;
-
-pub mod error;
-
-use error::{ParseError, ParseErrorType};
-
-
-
-use super::conf::{self,Record,Value};
-use super::def::container::branch::BranchContainer;
-use super::def::container::node_children::NodeChildrenContainer;
-// use super::def::container::param_group::ParamGroupContainer;
-use super::lexer::{Lexer, Token};
-use super::Conf;
-
 //allow individual params to be marked optional, so if an optional param fails, can move onto the next one
 //  but tagless nodes need to atleast have one value match? actually won't be a problem because a record has to have atleast one value, and if that value isn't matched to a tagless node's param, then it will fail
 
@@ -70,6 +52,35 @@ use super::Conf;
 
 */
 
+/*
+TODO
+* multi line comments
+** start comment must have nothing or only whitespace in front of it
+** end comment must have nothing or only whitespace after it
+** #> comment <# or #! comment !#
+
+
+*/
+
+
+use std::any::{Any, TypeId};
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
+use std::path::Path;
+
+pub mod error;
+
+use error::{ParseError, ParseErrorType};
+
+
+
+use super::conf::{self,Record,Value};
+use super::def::container::branch::BranchContainer;
+use super::def::container::node_children::NodeChildrenContainer;
+// use super::def::container::param_group::ParamGroupContainer;
+use super::lexer::{Lexer, Token};
+use super::Conf;
+
 
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
@@ -78,14 +89,16 @@ pub fn parse_start<'a>(
     path:Option<&'a Path>,
 ) -> Result<Conf,ParseError> {
     let mut lexer = Lexer::new(src);//cs.clone()
+    // lexer.debug_print(true);
     let lexer=&mut lexer;
     lexer.debug_label_push("start");
 
-    // start => (body | cmnt | ending | record)*
+    // start => (body | ending | ml_cmnt | cmnt | record)*
 
     // record => indent val (sep val)* (cmnt | ending)
     // body => {has_record_body}: (ending|indent not_eols ending)+
     // cmnt => spc? [#] not_eols ending
+    // ml_cmnt => spc? "#!" (^"!#"|"\\!")* "!#" ending
 
     // val => q_val | s_val
     // s_val => ([\\]([\s\t\n\\]|[\r][\n]|quotes)|[^\s\t\n]|^([\r][\n]))+
@@ -170,7 +183,7 @@ pub fn parse_start<'a>(
             }
         }
 
-        if parse_ending(lexer) || parse_cmnt(lexer) {
+        if parse_ending(lexer) || parse_ml_cmnt(lexer) || parse_cmnt(lexer) {
             continue;
         }
         
@@ -1395,5 +1408,61 @@ fn parse_cmnt(lexer : &mut Lexer
     //
     lexer.pop_keep();
     lexer.debug_label_pop();
+    true
+}
+
+
+
+
+fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
+    // ml_cmnt => spc? "#!" (^"!#"|"\\!")* "!#" ending
+ 
+    //
+    lexer.debug_label_push("ml_cmnt");
+    lexer.push();
+
+    //
+    parse_spc(lexer);
+
+    //
+    
+    if lexer.has(0, ["#!"]).is_none() {
+        lexer.pop_discard();
+        lexer.debug_label_pop();
+        println!("hmm start");
+        return false;
+    }
+
+    lexer.skip(2);
+
+    //
+    while (lexer.has(0, ["!#"]).is_none() && lexer.skip(1).is_some()) 
+        || (lexer.has(0, ["\\!"]).is_some() && lexer.skip(2).is_some()) 
+    {
+    }
+
+    //
+    if lexer.has(0, ["!#"]).is_none() {
+        lexer.pop_discard();
+        lexer.debug_label_pop();
+        println!("hmm end");
+        return false;
+    }
+
+    lexer.skip(2);
+
+    //
+    if !parse_ending(lexer) {
+        lexer.pop_discard();
+        lexer.debug_label_pop();
+        println!("hmm end2");
+        return false;
+    }
+
+    //
+    lexer.pop_keep();
+    lexer.debug_label_pop();
+    
+    println!("hmm ok");
     true
 }
