@@ -46,7 +46,7 @@ fn walk_test1() {
     };
 
     let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
-        walk.set_note(format!("note is {} @ {}",walk.record().tag().unwrap_or("_"),walk.depth()));
+        // walk.set_note(format!("note is {} @ {}",walk.record().tag().unwrap_or("_"),walk.depth()));
 
         // walk.have_exit();
         let record=walk.record();
@@ -54,15 +54,20 @@ fn walk_test1() {
         // // println!("===== {:?}",record.ancestors().map(|x|x.tag().unwrap_or_default()).collect::<Vec<_>>());
         // // println!("===== {:?}",record.get_parent().map(|x|x.tag().unwrap_or_default()));
         
-        println!("===== {} ::: {}",walk.ancestors().map(|x|format!("{}.'{}';{:?}",
-            x.record().tag().unwrap_or("_"),
-            x.record().values().map(|y|y.str()).collect::<Vec<_>>().join(", "),
-            x.get_note::<String>(),
-        )).collect::<Vec<_>>().join(", "), walk.ancestors_num());
+        // println!("===== {} ::: {}",walk.ancestors().map(|x|format!("{}.'{}';{:?}",
+        //     x.record().tag().unwrap_or("_"),
+        //     x.record().values().map(|y|y.str()).collect::<Vec<_>>().join(", "),
+        //     x.get_note::<String>(),
+        // )).collect::<Vec<_>>().join(", "), walk.ancestors_num());
 
         // println!("===== {:?} :: {}",walk.ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.ancestors_num());
         // println!("===== {:?} :: {}",walk.record().ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.record().ancestors().count());
 
+        // walk.set_note("note".to_string());
+        if let Some(x)=walk.get_note::<String>() {
+            println!("\tfrom: {x}");
+        }
+        
         match record.tag() {
             Some("include") if walk.is_enter() => { //include records from another file
                 let mut include_path=record.path().unwrap().to_path_buf();
@@ -71,7 +76,8 @@ fn walk_test1() {
     
                 return if let Some(conf_data)=confs.get(&include_path) {
                     // walk.extend(conf_data.0.root());
-                    walk.extend(conf_data.0.root().children());
+                    // walk.extend(conf_data.0.root().children());
+                    walk.extend_note(conf_data.0.root().children(),format!("{}",include_path.to_str().unwrap()));
                     // walk.extend_children(conf_data.0.root().children());
                     
                     // for child in conf_data.0.root().children() {
@@ -195,10 +201,11 @@ fn load_confs<P: AsRef<Path>>(def:conf_def::Def,dir:P) -> HashMap<PathBuf, (Conf
 
 fn get_record_info(walk:&Walk) -> String {
     let record=walk.record();
-    format!("{} {}{}: {}[{:}]{} @ ({}:{}:{})",
+    format!("{} {}{}:{}: {}[{:}]{} @ ({}:{}:{})",
         walk.is_exit().then_some("<=").unwrap_or("=>"),
         "   ".repeat(walk.depth()),
         walk.order(),
+        walk.breadth(),
         record.tag().map(|x|format!("{x:?} : ")).unwrap_or_default(),
         record.values().map(|x|format!("{:?}",x.str())).collect::<Vec<_>>().join(", "),
         record.has_text().then(||format!(" : {:?} :",record.text_values().map(|x|x.str()).collect::<Vec<_>>().join("\n"))).unwrap_or_default(),

@@ -35,6 +35,7 @@ pub struct WalkAncestor<'a> {
     note:Option<Rc<dyn Any>>,
     depth:usize,
     order:usize,
+    breadth:usize,
 }
 
 impl<'a> WalkAncestor<'a> {
@@ -49,6 +50,9 @@ impl<'a> WalkAncestor<'a> {
     }
     pub fn order(&self) -> usize {
         self.order
+    }
+    pub fn breadth(&self) -> usize {
+        self.breadth
     }
 }
 
@@ -89,6 +93,7 @@ pub struct Walk<'b,'a> {
     record:RecordContainer<'a>,
     depth:usize,
     order:usize,
+    breadth:usize,
     exit:bool,
     ancestors : &'b Vec<WalkAncestor<'a>>,
     skip_children : &'b mut bool,
@@ -115,6 +120,9 @@ impl<'b,'a> Walk<'b,'a> {
 
     pub fn order(&self) -> usize {
         self.order
+    }
+    pub fn breadth(&self) -> usize {
+        self.breadth
     }
 
     pub fn is_enter(&self) -> bool {
@@ -228,6 +236,7 @@ pub fn traverse<'a,E:Debug>(
 ) -> Result<(),WalkError<E>> {
 
     let mut walk_ancestors=Vec::new();
+    let mut breadths=vec![0];
     let mut stk=Vec::new();
     let mut order=0;
 
@@ -254,6 +263,13 @@ pub fn traverse<'a,E:Debug>(
         // walk_ancestors.truncate(cur_work.depth+cur_work.exit.then_some(1).unwrap_or(0));
 
         walk_ancestors.truncate(cur_work.depth);
+        breadths.resize(cur_work.depth+1,0);
+        
+        if !cur_work.exit {
+            *breadths.last_mut().unwrap()+=1;
+        }
+
+        let cur_breadth=breadths.last().cloned().unwrap()-1;
 
         //handle circular check here?
         
@@ -273,6 +289,7 @@ pub fn traverse<'a,E:Debug>(
             depth: cur_work.depth, 
             exit: cur_work.exit, 
             order:cur_order,
+            breadth :cur_breadth,
             ancestors: walk_ancestors.as_ref(),
             skip_children:&mut walk_skip_children,            
             sibling_inserts:&mut walk_sibling_inserts,
@@ -284,7 +301,13 @@ pub fn traverse<'a,E:Debug>(
         //
         //note set on entry is lost on exit? yes
         // if !cur_work.exit {
-        walk_ancestors.push(WalkAncestor { record: cur_work.record, note: walk_cur_note.clone(), depth: cur_work.depth, order:cur_order });
+        walk_ancestors.push(WalkAncestor { 
+            record: cur_work.record, 
+            note: walk_cur_note.clone(), 
+            depth: cur_work.depth, 
+            order:cur_order, 
+            breadth:cur_breadth,
+        });
         // }
 
         //
