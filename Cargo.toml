@@ -1,4 +1,4 @@
 [package]
-name = "conf_def"
-version = "0.1.19"
+name = "conf_lang"
+version = "0.1.0"
 edition = "2021"

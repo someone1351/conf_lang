@@ -1,4 +1,4 @@
-# conf_def
+# conf_lang
 
 A indent based config file language with validator written in Rust.
 

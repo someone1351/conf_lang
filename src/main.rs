@@ -1,9 +1,9 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
 
-use conf_def::{ Conf, RecordContainer, Walk};
+use conf_lang::{ Conf, RecordContainer, Walk};
 
-fn walk_test1_def() -> conf_def::Def {
-    conf_def::Def::new()
+fn walk_test1_def() -> conf_lang::Def {
+    conf_lang::Def::new()
         .branch("root_branch")
             .tag_nodes(["text"])
                 .entry_text(None) 
@@ -123,24 +123,24 @@ fn walk_test1() {
 }
 
 fn walk_test2() {
-    let def = conf_def::Def::new()
+    let def = conf_lang::Def::new()
         .param_parse::<i32>()
         .param_parse::<i32>()
         ;
 
-    // let def = conf_def::Def::new()
+    // let def = conf_lang::Def::new()
     //     .group(None,false,false)
     //         .parse::<i32>()
     //         .parse::<i32>()
     //     ;
 
-    // let def = conf_def::Def::new()
+    // let def = conf_lang::Def::new()
     //     .entry(None)
     //         .parse::<i32>()
     //         .parse::<i32>()
     //     ;
 
-    // let def = conf_def::Def::new()
+    // let def = conf_lang::Def::new()
     //     .branch("a")
     //         .parse::<f32>()
     //     .branch("b")
@@ -173,7 +173,7 @@ fn main() {
     walk_test2();
 }
 
-fn load_confs<P: AsRef<Path>>(def:conf_def::Def,dir:P) -> HashMap<PathBuf, (Conf,String)> {
+fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, (Conf,String)> {
     let root_branch=def.get_root_branch(); //.get_branch("root_branch");
 
     let file_paths = Vec::from_iter(std::fs::read_dir(dir).unwrap().filter_map(Result::ok)

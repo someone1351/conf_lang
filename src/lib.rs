@@ -1,9 +1,5 @@
  
 
-//condef, Condef
-//confdef, Confdef
-//conf_def, ConfDef
-
 
 mod def;
 mod lexer;
