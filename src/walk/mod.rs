@@ -216,7 +216,7 @@ impl<'b,'a> Walk<'b,'a> {
     pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
         self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
     }
-    pub fn have_exit(&mut self) {
+    pub fn do_exit(&mut self) {
         *self.have_exit=true;
     }
 }
