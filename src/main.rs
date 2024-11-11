@@ -48,7 +48,7 @@ fn walk_test1() {
     let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
         // walk.set_note(format!("note is {} @ {}",walk.record().tag().unwrap_or("_"),walk.depth()));
 
-        // walk.have_exit();
+        walk.do_exit();
         let record=walk.record();
         println!("{}",get_record_info(&walk));
         // // println!("===== {:?}",record.ancestors().map(|x|x.tag().unwrap_or_default()).collect::<Vec<_>>());
