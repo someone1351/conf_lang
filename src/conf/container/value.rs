@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::path::Path;
 
 use super::super::Conf;
 use super::super::super::lexer::Loc;
@@ -7,6 +8,17 @@ use super::super::super::lexer::Loc;
 pub struct ValueContainer<'a> {
     pub(super) conf : Option<&'a Conf>,
     pub(super) conf_value_ind : usize,
+}
+
+impl<'a> std::fmt::Debug for ValueContainer<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f,"Value({self})")
+    }
+}
+impl<'a> std::fmt::Display for ValueContainer<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.str())
+    }
 }
 
 impl<'a> ValueContainer<'a> {
@@ -20,6 +32,11 @@ impl<'a> ValueContainer<'a> {
         if self.conf.is_none() {return Loc::zero();};
         let val=self.conf.unwrap().values.get(self.conf_value_ind).unwrap();
         val.end_loc
+    }
+
+    pub fn path(&self) -> Option<&'a Path> {
+        if self.conf.is_none() {return Default::default();};
+        self.conf.unwrap().path.as_ref().and_then(|x|Some(x.as_path()))
     }
 
     pub fn get_str(&self) -> Option<&'a str> {
