@@ -210,12 +210,27 @@ impl<'b,'a> Walk<'b,'a> {
         self.child_inserts.extend(records.into_iter().map(|x|(x,note.clone())));
     }
 
+    /*
+    todo
+    * have multiple notes settable, use a hashmap with type id to store them
+    * remove extend_note, extend_chldren_note
+    * * instead have set_sub_note, clear_sub_notes
+    
+     */
+    pub fn set_extend_note<T:Any>(&mut self, _note:T) {
+        // *self.cur_note=Some(Rc::new(note));
+    }
+    pub fn clear_extend_notes(&mut self, ) {
+
+    }
+
     pub fn set_note<T:Any>(&mut self, note:T) {
         *self.cur_note=Some(Rc::new(note));
     }
     pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
         self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
     }
+
     pub fn do_exit(&mut self) {
         *self.have_exit=true;
     }
