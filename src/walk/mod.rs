@@ -32,12 +32,18 @@ use super::conf::container::record::RecordContainer;
 
 */
 
+#[derive(Clone,Hash,PartialEq, Eq)]
+enum WalkNoteType<'a> {
+    Named(&'a str),
+    Typed(std::any::TypeId),
+}
+
 
 #[derive(Clone,Default)]
 pub struct WalkAncestor<'a> {
     record:RecordContainer<'a>,
     // note:Option<Rc<dyn Any>>,
-    notes:HashMap<std::any::TypeId,Rc<dyn Any>>,
+    notes:HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
     depth:usize,
     order:usize,
     breadth:usize,
@@ -47,9 +53,13 @@ impl<'a> WalkAncestor<'a> {
     pub fn record(&self) -> RecordContainer<'a> {
         self.record
     }
-    pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
+    pub fn get_note<T:Any>(&self) -> Option<&T> { //+Clone
         // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
-        self.notes.get(&std::any::TypeId::of::<T>()).and_then(|x|x.as_ref().downcast_ref::<T>()).cloned()
+        self.notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+    }
+    pub fn get_named_note<T:Any>(&self,name:&'a str) -> Option<&T> { //+Clone
+        // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        self.notes.get(&WalkNoteType::Named(name)).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
     }
     pub fn depth(&self) -> usize {
         self.depth
@@ -105,12 +115,12 @@ pub struct Walk<'b,'a> {
     skip_children : &'b mut bool,
     // sibling_inserts : &'b mut Vec<Bla<'a>>,
     // child_inserts : &'b mut Vec<Bla<'a>>,
-    sub_notes : HashMap<std::any::TypeId,Rc<dyn Any>>,
-    sibling_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<std::any::TypeId,Rc<dyn Any>>)>,
-    child_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<std::any::TypeId,Rc<dyn Any>>)>,
+    sub_notes : HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
+    sibling_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
+    child_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
     have_exit : &'b mut bool,
     // cur_note : &'b mut Option<Rc<dyn Any>>,
-    cur_notes : &'b mut HashMap<std::any::TypeId,Rc<dyn Any>>,
+    cur_notes : &'b mut HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -229,7 +239,11 @@ impl<'b,'a> Walk<'b,'a> {
      */
     pub fn set_extend_note<T:Any>(&mut self, note:T) {
         // *self.cur_note=Some(Rc::new(note));
-        self.sub_notes.insert(note.type_id(), Rc::new(note));
+        self.sub_notes.insert(WalkNoteType::Typed(note.type_id()), Rc::new(note));
+    }
+    pub fn set_extend_named_note<T:Any>(&mut self, name:&'a str,note:T) {
+        // *self.cur_note=Some(Rc::new(note));
+        self.sub_notes.insert(WalkNoteType::Named(name), Rc::new(note));
     }
     // pub fn remove_extend_note(&mut self, ) {
 
@@ -239,15 +253,15 @@ impl<'b,'a> Walk<'b,'a> {
     // }
 
     pub fn set_note<T:Any>(&mut self, note:T) {
-        self.cur_notes.insert(note.type_id(), Rc::new(note));
+        self.cur_notes.insert(WalkNoteType::Typed(note.type_id()), Rc::new(note));
         // *self.cur_note=Some(Rc::new(note));
     }
-    pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
-        self.cur_notes.get(&std::any::TypeId::of::<T>()).and_then(|x|x.as_ref().downcast_ref::<T>()).cloned()
+    pub fn get_note<T:Any>(&self) -> Option<&T> { //+Clone
+        self.cur_notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
         // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
     }
     
-    pub fn find_note<T:Any+Clone>(&self) -> Option<T> {
+    pub fn find_note<T:Any>(&self) -> Option<&T> { //+Clone
         let x=self.get_note();
 
         if x.is_some() {
@@ -257,7 +271,39 @@ impl<'b,'a> Walk<'b,'a> {
         self.ancestors().find_map(|x|x.get_note())
     }
 
+    // pub fn find_note_map<T:Any>(&self, 
+    //     func:impl Fn(RecordContainer<'a>)->Option<T>
+    // ) -> Option<&T> { //+Clone
+    //     let x=self.get_note();
 
+    //     if x.is_some() {
+    //         return x;
+    //     }
+
+    //     self.ancestors().find_map(|x|x.get_note())
+    // }
+    //
+
+    pub fn set_named_note<T:Any>(&mut self, name:&'a str,note:T) {
+        self.cur_notes.insert(WalkNoteType::Named(name), Rc::new(note));
+        // *self.cur_note=Some(Rc::new(note));
+    }
+    pub fn get_named_note<T:Any>(&self, name:&'a str) -> Option<&T> { //+Clone
+        self.cur_notes.get(&WalkNoteType::Named(name)).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+    }
+    
+    pub fn find_named_note<T:Any>(&self, name:&'a str) -> Option<&T> { //+Clone
+        let x=self.get_named_note(name);
+
+        if x.is_some() {
+            return x;
+        }
+
+        self.ancestors().find_map(|x|x.get_named_note(name))
+    }
+
+    //
     pub fn do_exit(&mut self) {
         *self.have_exit=true;
     }
@@ -270,7 +316,7 @@ struct Work<'a> {
     exit_order:usize,
     visiteds:HashSet<(Option<&'a Path>, usize)>,
     // note : Option<Rc<dyn Any>>,
-    notes : HashMap<std::any::TypeId,Rc<dyn Any>>,
+    notes : HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
 }
 
 pub fn traverse<'a,E:Debug>(

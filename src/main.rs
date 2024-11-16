@@ -64,10 +64,13 @@ fn walk_test1() {
         // println!("===== {:?} :: {}",walk.record().ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.record().ancestors().count());
 
         // walk.set_note("note".to_string());
-        if let Some(x)=walk.get_note::<String>() {
+        // if let Some(x)=walk.get_note::<String>() {
+        //     println!("\tfrom: {x}");
+        // }
+        
+        if let Some(x)=walk.get_named_note::<String>("from") {
             println!("\tfrom: {x}");
         }
-        
         match record.tag() {
             Some("include") if walk.is_enter() => { //include records from another file
                 let mut include_path=record.path().unwrap().to_path_buf();
@@ -77,7 +80,8 @@ fn walk_test1() {
                 return if let Some(conf_data)=confs.get(&include_path) {
                     // walk.extend(conf_data.0.root());
                     // walk.extend(conf_data.0.root().children());
-                    walk.set_extend_note(format!("{}",include_path.to_str().unwrap()));
+                    // walk.set_extend_note(format!("{}",include_path.to_str().unwrap()));
+                    walk.set_extend_named_note("from",format!("{}",include_path.to_str().unwrap()));
                     walk.extend(conf_data.0.root().children(),);
                     // walk.extend_children(conf_data.0.root().children());
                     
