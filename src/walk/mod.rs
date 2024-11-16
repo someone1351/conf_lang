@@ -1,5 +1,6 @@
 pub mod error;
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::{collections::HashSet, fmt::Debug, path::Path};
 
@@ -26,13 +27,17 @@ use super::conf::container::record::RecordContainer;
 //  in recordcontainer for walk inserrted record, can store parent info
 //
 
+/*
+* allow setting child notes? not necessary, can just set note on cur node, and use find_note on the child to get it
 
+*/
 
 
 #[derive(Clone,Default)]
 pub struct WalkAncestor<'a> {
     record:RecordContainer<'a>,
-    note:Option<Rc<dyn Any>>,
+    // note:Option<Rc<dyn Any>>,
+    notes:HashMap<std::any::TypeId,Rc<dyn Any>>,
     depth:usize,
     order:usize,
     breadth:usize,
@@ -43,7 +48,8 @@ impl<'a> WalkAncestor<'a> {
         self.record
     }
     pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
-        self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        self.notes.get(&std::any::TypeId::of::<T>()).and_then(|x|x.as_ref().downcast_ref::<T>()).cloned()
     }
     pub fn depth(&self) -> usize {
         self.depth
@@ -99,10 +105,12 @@ pub struct Walk<'b,'a> {
     skip_children : &'b mut bool,
     // sibling_inserts : &'b mut Vec<Bla<'a>>,
     // child_inserts : &'b mut Vec<Bla<'a>>,
-    sibling_inserts : &'b mut Vec<(RecordContainer<'a>,Option<Rc<dyn Any>>)>,
-    child_inserts : &'b mut Vec<(RecordContainer<'a>,Option<Rc<dyn Any>>)>,
+    sub_notes : HashMap<std::any::TypeId,Rc<dyn Any>>,
+    sibling_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<std::any::TypeId,Rc<dyn Any>>)>,
+    child_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<std::any::TypeId,Rc<dyn Any>>)>,
     have_exit : &'b mut bool,
-    cur_note : &'b mut Option<Rc<dyn Any>>,
+    // cur_note : &'b mut Option<Rc<dyn Any>>,
+    cur_notes : &'b mut HashMap<std::any::TypeId,Rc<dyn Any>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -184,31 +192,33 @@ impl<'b,'a> Walk<'b,'a> {
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {
-        self.sibling_inserts.extend(records.into_iter().map(|x|(x,None)));
+        self.sibling_inserts.extend(records.into_iter().map(|x|(x,self.sub_notes.clone())));
+        self.sub_notes.clear();
     }
 
     pub fn extend_children<I>(&mut self, records : I) 
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {
-        self.child_inserts.extend(records.into_iter().map(|x|(x,None)));
+        self.child_inserts.extend(records.into_iter().map(|x|(x,self.sub_notes.clone())));
+        self.sub_notes.clear();
     }
 
-    pub fn extend_note<I,T:Any>(&mut self, records : I, note:T) 
-    where
-        I : IntoIterator<Item=RecordContainer<'a>>
-    {
-        let note:Option<Rc<(dyn Any)>>=Some(Rc::new(note));
-        self.sibling_inserts.extend(records.into_iter().map(|x|(x, note.clone())));
-    }
+    // pub fn extend_note<I,T:Any>(&mut self, records : I, note:T) 
+    // where
+    //     I : IntoIterator<Item=RecordContainer<'a>>
+    // {
+    //     let note:Option<Rc<(dyn Any)>>=Some(Rc::new(note));
+    //     self.sibling_inserts.extend(records.into_iter().map(|x|(x, note.clone())));
+    // }
 
-    pub fn extend_children_note<I,T:Any>(&mut self, records : I, note:T) 
-    where
-        I : IntoIterator<Item=RecordContainer<'a>>
-    {
-        let note:Option<Rc<(dyn Any)>>=Some(Rc::new(note));
-        self.child_inserts.extend(records.into_iter().map(|x|(x,note.clone())));
-    }
+    // pub fn extend_children_note<I,T:Any>(&mut self, records : I, note:T) 
+    // where
+    //     I : IntoIterator<Item=RecordContainer<'a>>
+    // {
+    //     let note:Option<Rc<(dyn Any)>>=Some(Rc::new(note));
+    //     self.child_inserts.extend(records.into_iter().map(|x|(x,note.clone())));
+    // }
 
     /*
     todo
@@ -217,19 +227,36 @@ impl<'b,'a> Walk<'b,'a> {
     * * instead have set_sub_note, clear_sub_notes
     
      */
-    pub fn set_extend_note<T:Any>(&mut self, _note:T) {
+    pub fn set_extend_note<T:Any>(&mut self, note:T) {
         // *self.cur_note=Some(Rc::new(note));
+        self.sub_notes.insert(note.type_id(), Rc::new(note));
     }
-    pub fn clear_extend_notes(&mut self, ) {
+    // pub fn remove_extend_note(&mut self, ) {
 
-    }
+    // }
+    // pub fn clear_extend_notes(&mut self, ) {
+
+    // }
 
     pub fn set_note<T:Any>(&mut self, note:T) {
-        *self.cur_note=Some(Rc::new(note));
+        self.cur_notes.insert(note.type_id(), Rc::new(note));
+        // *self.cur_note=Some(Rc::new(note));
     }
     pub fn get_note<T:Any+Clone>(&self) -> Option<T> {
-        self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        self.cur_notes.get(&std::any::TypeId::of::<T>()).and_then(|x|x.as_ref().downcast_ref::<T>()).cloned()
+        // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
     }
+    
+    pub fn find_note<T:Any+Clone>(&self) -> Option<T> {
+        let x=self.get_note();
+
+        if x.is_some() {
+            return x;
+        }
+
+        self.ancestors().find_map(|x|x.get_note())
+    }
+
 
     pub fn do_exit(&mut self) {
         *self.have_exit=true;
@@ -242,7 +269,8 @@ struct Work<'a> {
     exit:bool,
     exit_order:usize,
     visiteds:HashSet<(Option<&'a Path>, usize)>,
-    note : Option<Rc<dyn Any>>,
+    // note : Option<Rc<dyn Any>>,
+    notes : HashMap<std::any::TypeId,Rc<dyn Any>>,
 }
 
 pub fn traverse<'a,E:Debug>(
@@ -265,7 +293,8 @@ pub fn traverse<'a,E:Debug>(
                 exit:false,
                 exit_order:0,
                 visiteds:visiteds.clone(),
-                note : None,
+                // note : None,
+                notes:HashMap::new(),
             }
         }));
     }
@@ -293,7 +322,7 @@ pub fn traverse<'a,E:Debug>(
         let mut walk_sibling_inserts=Vec::new();
         let mut walk_child_inserts=Vec::new();
         let mut walk_have_exit=false;
-        let mut walk_cur_note=cur_work.note.clone();
+        let mut walk_cur_notes=cur_work.notes.clone();
 
         //
         let cur_order=cur_work.exit.then_some(cur_work.exit_order).unwrap_or(order);
@@ -310,15 +339,16 @@ pub fn traverse<'a,E:Debug>(
             sibling_inserts:&mut walk_sibling_inserts,
             child_inserts:&mut walk_child_inserts,
             have_exit:&mut walk_have_exit,
-            cur_note: &mut walk_cur_note,
+            cur_notes: &mut walk_cur_notes,
+            sub_notes:HashMap::new(),
         })?;
 
         //
         //note set on entry is lost on exit? yes
         // if !cur_work.exit {
-        walk_ancestors.push(WalkAncestor { 
+        walk_ancestors.push(WalkAncestor { //not used yet? pre adding cur to ancestors
             record: cur_work.record, 
-            note: walk_cur_note.clone(), 
+            notes: walk_cur_notes.clone(), 
             depth: cur_work.depth, 
             order:cur_order, 
             breadth:cur_breadth,
@@ -326,7 +356,7 @@ pub fn traverse<'a,E:Debug>(
         // }
 
         //
-        for (include_record, include_note) in walk_sibling_inserts.into_iter().rev() {
+        for (include_record, include_notes) in walk_sibling_inserts.into_iter().rev() {
             //
             let visited_key=(include_record.path(),include_record.record_index());
             
@@ -349,7 +379,7 @@ pub fn traverse<'a,E:Debug>(
                 exit:false,
                 exit_order:0,
                 visiteds:visiteds.clone(),
-                note : include_note.clone(),
+                notes : include_notes.clone(),
             });
         }
 
@@ -371,13 +401,13 @@ pub fn traverse<'a,E:Debug>(
                     exit:true, 
                     exit_order:order,
                     visiteds:cur_work.visiteds.clone(),
-                    note : walk_cur_note.clone(),
+                    notes : walk_cur_notes.clone(),
                 });
             }
         }
 
         //
-        for (child_record,child_note) in walk_child_inserts.into_iter().rev() {
+        for (child_record,child_notes) in walk_child_inserts.into_iter().rev() {
             let visited_key=(child_record.path(),child_record.record_index());
             
             if cur_work.visiteds.contains(&visited_key) {
@@ -399,7 +429,7 @@ pub fn traverse<'a,E:Debug>(
                 exit:false,
                 exit_order:0,
                 visiteds:cur_work.visiteds.clone(),
-                note : child_note.clone(),
+                notes : child_notes.clone(),
             });
         }
 
@@ -413,7 +443,7 @@ pub fn traverse<'a,E:Debug>(
                     exit:false,
                     exit_order:0,
                     visiteds:cur_work.visiteds.clone(),
-                    note : None,
+                    notes: HashMap::new(),
                 }));
             }
 
