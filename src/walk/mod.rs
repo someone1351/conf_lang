@@ -149,9 +149,10 @@ pub struct Walk<'b,'a> {
     skip_children : &'b mut bool,
     // sibling_inserts : &'b mut Vec<Bla<'a>>,
     // child_inserts : &'b mut Vec<Bla<'a>>,
-    sub_notes : HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
-    sibling_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
-    child_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
+    // sub_notes : HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
+    record_inserts : &'b mut Vec<RecordContainer<'a>>,
+    // sibling_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
+    // child_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
     have_exit : &'b mut bool,
     // cur_note : &'b mut Option<Rc<dyn Any>>,
     cur_notes : &'b mut HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
@@ -232,21 +233,29 @@ impl<'b,'a> Walk<'b,'a> {
         *self.skip_children=true;
     }
 
-    pub fn extend<I>(&mut self, records : I) 
+    pub fn extendx<I>(&mut self, records : I) 
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {
-        self.sibling_inserts.extend(records.into_iter().map(|x|(x,self.sub_notes.clone())));
-        self.sub_notes.clear();
+        self.record_inserts.extend(records);
+        // self.sub_notes.clear();
     }
 
-    pub fn extend_children<I>(&mut self, records : I) 
-    where
-        I : IntoIterator<Item=RecordContainer<'a>>
-    {
-        self.child_inserts.extend(records.into_iter().map(|x|(x,self.sub_notes.clone())));
-        self.sub_notes.clear();
-    }
+    // pub fn extend<I>(&mut self, records : I) 
+    // where
+    //     I : IntoIterator<Item=RecordContainer<'a>>
+    // {
+    //     self.sibling_inserts.extend(records.into_iter().map(|x|(x,self.sub_notes.clone())));
+    //     self.sub_notes.clear();
+    // }
+
+    // pub fn extend_children<I>(&mut self, records : I) 
+    // where
+    //     I : IntoIterator<Item=RecordContainer<'a>>
+    // {
+    //     self.child_inserts.extend(records.into_iter().map(|x|(x,self.sub_notes.clone())));
+    //     self.sub_notes.clear();
+    // }
 
     // pub fn extend_note<I,T:Any>(&mut self, records : I, note:T) 
     // where
@@ -271,14 +280,14 @@ impl<'b,'a> Walk<'b,'a> {
     * * instead have set_sub_note, clear_sub_notes
     
      */
-    pub fn set_extend_note<T:Any>(&mut self, note:T) {
-        // *self.cur_note=Some(Rc::new(note));
-        self.sub_notes.insert(WalkNoteType::Typed(note.type_id()), Rc::new(note));
-    }
-    pub fn set_extend_named_note<T:Any>(&mut self, name:&'a str,note:T) {
-        // *self.cur_note=Some(Rc::new(note));
-        self.sub_notes.insert(WalkNoteType::Named(name), Rc::new(note));
-    }
+    // pub fn set_extend_note<T:Any>(&mut self, note:T) {
+    //     // *self.cur_note=Some(Rc::new(note));
+    //     self.sub_notes.insert(WalkNoteType::Typed(note.type_id()), Rc::new(note));
+    // }
+    // pub fn set_extend_named_note<T:Any>(&mut self, name:&'a str,note:T) {
+    //     // *self.cur_note=Some(Rc::new(note));
+    //     self.sub_notes.insert(WalkNoteType::Named(name), Rc::new(note));
+    // }
     // pub fn remove_extend_note(&mut self, ) {
 
     // }
@@ -329,9 +338,11 @@ impl<'b,'a> Walk<'b,'a> {
             v.push(x);
         }
 
-        for x in self.ancestors().filter_map(|x|x.get_note::<T>()) {
-            v.push(x);
-        }
+        v.extend(self.ancestors().filter_map(|x|x.get_note::<T>()));
+
+        // for x in self.ancestors().filter_map(|x|x.get_note::<T>()) {
+        //     v.push(x);
+        // }
 
         v.into_iter()
     }
@@ -342,9 +353,11 @@ impl<'b,'a> Walk<'b,'a> {
             v.push(x);
         }
 
-        for x in self.ancestors().filter_map(|x|x.get_named_note::<T>(name)) {
-            v.push(x);
-        }
+        v.extend(self.ancestors().filter_map(|x|x.get_named_note::<T>(name)));
+
+        // for x in self.ancestors().filter_map(|x|x.get_named_note::<T>(name)) {
+        //     v.push(x);
+        // }
 
         v.into_iter()
     }
@@ -425,8 +438,9 @@ pub fn traverse<'a,E:Debug>(
         
         //
         let mut walk_skip_children=false;
-        let mut walk_sibling_inserts=Vec::new();
-        let mut walk_child_inserts=Vec::new();
+        // let mut walk_sibling_inserts=Vec::new();
+        // let mut walk_child_inserts=Vec::new();
+        let mut walk_record_inserts=Vec::new();
         let mut walk_have_exit=false;
         let mut walk_cur_notes=cur_work.notes.clone();
 
@@ -442,11 +456,12 @@ pub fn traverse<'a,E:Debug>(
             breadth :cur_breadth,
             ancestors: walk_ancestors.as_ref(),
             skip_children:&mut walk_skip_children,            
-            sibling_inserts:&mut walk_sibling_inserts,
-            child_inserts:&mut walk_child_inserts,
+            // sibling_inserts:&mut walk_sibling_inserts,
+            // child_inserts:&mut walk_child_inserts,
             have_exit:&mut walk_have_exit,
             cur_notes: &mut walk_cur_notes,
-            sub_notes:HashMap::new(),
+            record_inserts: &mut walk_record_inserts,
+            // sub_notes:HashMap::new(),
         })?;
 
         //
@@ -461,8 +476,50 @@ pub fn traverse<'a,E:Debug>(
         });
         // }
 
-        //
-        for (include_record, include_notes) in walk_sibling_inserts.into_iter().rev() {
+        // //
+        // for (include_record, include_notes) in walk_sibling_inserts.into_iter().rev() {
+        //     //
+        //     let visited_key=(include_record.path(),include_record.record_index());
+            
+        //     if cur_work.visiteds.contains(&visited_key) {
+        //         return Err(WalkError{
+        //             path:cur_work.record.path().map(|p|p.to_path_buf()),
+        //             loc:cur_work.record.start_loc(),
+        //             error_type:WalkErrorType::RecursiveInclude,
+        //         });
+        //     }
+
+        //     //
+        //     let mut visiteds=cur_work.visiteds.clone();
+        //     visiteds.insert(visited_key);
+
+        //     //
+        //     stk.push(Work { 
+        //         record: include_record,
+        //         depth:cur_work.depth,
+        //         exit:false,
+        //         exit_order:0,
+        //         visiteds:visiteds.clone(),
+        //         notes : include_notes.clone(),
+        //     });
+        // }
+
+
+        //push exit
+        if !cur_work.exit && walk_have_exit { // !walk_skip_exit //skip_exit obviously only works on enter
+            stk.push(Work {
+                record: cur_work.record,
+                depth:cur_work.depth,
+                exit:true, 
+                exit_order:order,
+                visiteds:cur_work.visiteds.clone(),
+                notes : walk_cur_notes.clone(),
+            });
+        }
+
+        //if inserted on enter, then inserts as children, else if on exit, then inserts as siblings
+        for include_record in walk_record_inserts.into_iter().rev() {
+            let as_children = !cur_work.exit;
             //
             let visited_key=(include_record.path(),include_record.record_index());
             
@@ -476,68 +533,74 @@ pub fn traverse<'a,E:Debug>(
 
             //
             let mut visiteds=cur_work.visiteds.clone();
-            visiteds.insert(visited_key);
+
+            if !as_children {
+                visiteds.insert(visited_key);
+            };
+
+            //
+            let depth=cur_work.depth + if as_children {1}else{0};
 
             //
             stk.push(Work { 
                 record: include_record,
-                depth:cur_work.depth,
+                depth,
                 exit:false,
                 exit_order:0,
-                visiteds:visiteds.clone(),
-                notes : include_notes.clone(),
+                visiteds,
+                notes : HashMap::new(),
             });
         }
-
         //
         //allow inserting children on exit?
         //allow inserting on exit?
         
         //on enter add: includes, exit, insert children, children, 
         //on exit add: includes, insert children,
+        
 
-        //
-        if !cur_work.exit { 
-            //push exit
-            if walk_have_exit // !walk_skip_exit 
-            { //skip_exit obviously only works on enter
-                stk.push(Work {
-                    record: cur_work.record,
-                    depth:cur_work.depth,
-                    exit:true, 
-                    exit_order:order,
-                    visiteds:cur_work.visiteds.clone(),
-                    notes : walk_cur_notes.clone(),
-                });
-            }
-        }
+        // //
+        // if !cur_work.exit { 
+        //     //push exit
+        //     if walk_have_exit // !walk_skip_exit 
+        //     { //skip_exit obviously only works on enter
+        //         stk.push(Work {
+        //             record: cur_work.record,
+        //             depth:cur_work.depth,
+        //             exit:true, 
+        //             exit_order:order,
+        //             visiteds:cur_work.visiteds.clone(),
+        //             notes : walk_cur_notes.clone(),
+        //         });
+        //     }
+        // }
 
-        //
-        for (child_record,child_notes) in walk_child_inserts.into_iter().rev() {
-            let visited_key=(child_record.path(),child_record.record_index());
+        // //
+        // for (child_record,child_notes) in walk_child_inserts.into_iter().rev() {
+        //     let visited_key=(child_record.path(),child_record.record_index());
             
-            if cur_work.visiteds.contains(&visited_key) {
-                return Err(WalkError{
-                    path:cur_work.record.path().map(|p|p.to_path_buf()),
-                    loc:cur_work.record.start_loc(),
-                    error_type:WalkErrorType::RecursiveInclude,
-                });
-            }
+        //     if cur_work.visiteds.contains(&visited_key) {
+        //         return Err(WalkError{
+        //             path:cur_work.record.path().map(|p|p.to_path_buf()),
+        //             loc:cur_work.record.start_loc(),
+        //             error_type:WalkErrorType::RecursiveInclude,
+        //         });
+        //     }
 
-            //
-            let mut visiteds=cur_work.visiteds.clone();
-            visiteds.insert(visited_key);
+        //     //
+        //     let mut visiteds=cur_work.visiteds.clone();
+        //     visiteds.insert(visited_key);
 
-            //
-            stk.push(Work { 
-                record: child_record,
-                depth:cur_work.depth+1,
-                exit:false,
-                exit_order:0,
-                visiteds:cur_work.visiteds.clone(),
-                notes : child_notes.clone(),
-            });
-        }
+        //     //
+        //     stk.push(Work { 
+        //         record: child_record,
+        //         depth:cur_work.depth+1,
+        //         exit:false,
+        //         exit_order:0,
+        //         visiteds:cur_work.visiteds.clone(),
+        //         notes : child_notes.clone(),
+        //     });
+        // }
 
         //
         if !cur_work.exit { 
