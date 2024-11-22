@@ -233,7 +233,7 @@ impl<'b,'a> Walk<'b,'a> {
         *self.skip_children=true;
     }
 
-    pub fn extendx<I>(&mut self, records : I) 
+    pub fn extend<I>(&mut self, records : I) 
     where
         I : IntoIterator<Item=RecordContainer<'a>>
     {

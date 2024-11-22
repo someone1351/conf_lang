@@ -83,7 +83,7 @@ fn walk_test1() {
                     // walk.set_extend_note(format!("{}",include_path.to_str().unwrap()));
                     // walk.set_extend_named_note("from",format!("{}",include_path.to_str().unwrap()));
                     walk.set_named_note("from",format!("{}",include_path.to_str().unwrap()));
-                    walk.extendx(conf_data.0.root().children(),);
+                    walk.extend(conf_data.0.root().children(),);
                     // walk.extend_children(conf_data.0.root().children());
                     
                     // for child in conf_data.0.root().children() {
