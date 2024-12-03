@@ -20,7 +20,7 @@ impl<'a> Input<'a> {
         // chrs :Chars<'a>,
         // chrs:CharIndices<'a>,
         src:&'a str,
-    ) -> Input {
+    ) -> Self {
         Self {
             chrs : src.chars(), 
             // chrs:src.char_indices(),
