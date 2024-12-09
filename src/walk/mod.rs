@@ -77,7 +77,7 @@ enum WalkNoteType<'a> {
 pub struct WalkAncestor<'a> {
     record:RecordContainer<'a>,
     // note:Option<Rc<dyn Any>>,
-    notes:HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
+    notes:HashMap<WalkNoteType<'a>,Vec<Rc<dyn Any>>>,
     depth:usize,
     order:usize,
     breadth:usize,
@@ -88,13 +88,17 @@ impl<'a> WalkAncestor<'a> {
         self.record
     }
     pub fn get_note<T:Any>(&self) -> Option<&T> {
-        // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
-        self.notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        // // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        // self.notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        self.notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.last()).and_then(|x|x.downcast_ref::<T>())
     }
     pub fn get_named_note<T:Any>(&self,name:&'a str) -> Option<&T> {
-        // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
-        self.notes.get(&WalkNoteType::Named(name)).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        // // self.note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        // self.notes.get(&WalkNoteType::Named(name)).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        self.notes.get(&WalkNoteType::Named(name)).and_then(|x|x.last()).and_then(|x|x.downcast_ref::<T>())
     }
+
+
     pub fn depth(&self) -> usize {
         self.depth
     }
@@ -155,7 +159,7 @@ pub struct Walk<'b,'a> {
     // child_inserts : &'b mut Vec<(RecordContainer<'a>,HashMap<WalkNoteType<'a>,Rc<dyn Any>>)>,
     have_exit : &'b mut bool,
     // cur_note : &'b mut Option<Rc<dyn Any>>,
-    cur_notes : &'b mut HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
+    cur_notes : &'b mut HashMap<WalkNoteType<'a>,Vec<Rc<dyn Any>>>,
 }
 
 impl<'b,'a> Walk<'b,'a> {
@@ -296,21 +300,68 @@ impl<'b,'a> Walk<'b,'a> {
     // }
 
     pub fn set_note<T:Any>(&mut self, note:T) {
-        self.cur_notes.insert(WalkNoteType::Typed(note.type_id()), Rc::new(note));
-        // *self.cur_note=Some(Rc::new(note));
+        let notes=self.cur_notes.entry(WalkNoteType::Typed(note.type_id())).or_default();
+        let note=Rc::new(note);
+
+        if notes.is_empty() {
+            notes.push(note);
+        } else {
+            *notes.last_mut().unwrap()=note;
+        }
+
+        // self.cur_notes.insert(WalkNoteType::Typed(note.type_id()), Rc::new(note));
+        // // *self.cur_note=Some(Rc::new(note));
     }
     pub fn set_named_note<T:Any>(&mut self, name:&'a str,note:T) {
-        self.cur_notes.insert(WalkNoteType::Named(name), Rc::new(note));
-        // *self.cur_note=Some(Rc::new(note));
+        // self.cur_notes.insert(WalkNoteType::Named(name), Rc::new(note));
+        // // *self.cur_note=Some(Rc::new(note));
+
+        let notes=self.cur_notes.entry(WalkNoteType::Named(name)).or_default();
+        let note=Rc::new(note);
+
+        if notes.is_empty() {
+            notes.push(note);
+        } else {
+            *notes.last_mut().unwrap()=note;
+        }
+    }
+    
+    pub fn push_note<T:Any>(&mut self, note:T) {
+        let notes=self.cur_notes.entry(WalkNoteType::Typed(note.type_id())).or_default();
+        let note=Rc::new(note);
+        notes.push(note);
+    }
+    pub fn push_named_note<T:Any>(&mut self, name:&'a str,note:T) {
+        let notes=self.cur_notes.entry(WalkNoteType::Named(name)).or_default();
+        let note=Rc::new(note);
+        notes.push(note);
     }
     pub fn get_note<T:Any>(&self) -> Option<&T> {
-        self.cur_notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
-        // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        // self.cur_notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        // // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        self.cur_notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.last()).and_then(|x|x.downcast_ref::<T>())
     }
+    
     pub fn get_named_note<T:Any>(&self, name:&'a str) -> Option<&T> {
-        self.cur_notes.get(&WalkNoteType::Named(name)).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
-        // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        // self.cur_notes.get(&WalkNoteType::Named(name)).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+        // // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+        self.cur_notes.get(&WalkNoteType::Named(name)).and_then(|x|x.last()).and_then(|x|x.downcast_ref::<T>())
     }
+    // pub fn get_notes<T:Any>(&self) -> impl Iterator<Item = &T> {
+    //     // self.cur_notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.as_ref().downcast_ref::<T>()) //.cloned()
+    //     // // self.cur_note.as_ref().and_then(|x|x.downcast_ref::<T>().map(|x|x.clone()))
+    //     let x=self.cur_notes.get(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).map(|x|x.iter().map(|y|y.downcast_ref::<T>()));
+    //     let
+    // }
+    // pub fn pop_note<T:Any>(&mut self) -> Option<&T> {
+    //     self.cur_notes.get_mut(&WalkNoteType::Typed(std::any::TypeId::of::<T>())).and_then(|x|x.pop());
+    //     None       
+    // }
+
+    // pub fn pop_named_note<T:Any>(&mut self, name:&'a str) -> Option<&T> {
+    //     self.cur_notes.get_mut(&WalkNoteType::Named(name)).and_then(|x|x.pop());
+    //     None
+    // }
     
     pub fn find_note<T:Any>(&self) -> Option<&T> {
         let x=self.get_note();
@@ -319,7 +370,10 @@ impl<'b,'a> Walk<'b,'a> {
             return x;
         }
 
-        self.ancestors().find_map(|x|x.get_note())
+        self.ancestors().rev().find_map(|x|x.get_note())
+        // let note_type=WalkNoteType::Typed(std::any::TypeId::of::<T>());
+
+        // self.ancestors().rev().find_map(|x|x.notes.get(&note_type).map(|x|x.iter().rev().find_map(f)))
     }
     pub fn find_named_note<T:Any>(&self, name:&'a str) -> Option<&T> {
         let x=self.get_named_note(name);
@@ -328,37 +382,58 @@ impl<'b,'a> Walk<'b,'a> {
             return x;
         }
 
-        self.ancestors().find_map(|x|x.get_named_note(name))
+        self.ancestors().rev().find_map(|x|x.get_named_note(name))
     }
 
     pub fn filter_notes<T:Any>(&self) -> std::vec::IntoIter<&T> {
+        let note_type=WalkNoteType::Typed(std::any::TypeId::of::<T>());
+
         let mut v: Vec<&T> = Vec::new();
 
-        if let Some(x)=self.get_note() {
-            v.push(x);
+        for ancestor in self.ancestors() {
+            if let Some(notes)=ancestor.notes.get(&note_type) {
+                v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+            }
         }
+        // v.extend(self.ancestors().filter_map(|x|x.get_note::<T>()));
 
-        v.extend(self.ancestors().filter_map(|x|x.get_note::<T>()));
+        // // // for x in self.ancestors().filter_map(|x|x.get_note::<T>()) {
+        // // //     v.push(x);
+        // // // }
 
-        // for x in self.ancestors().filter_map(|x|x.get_note::<T>()) {
-        //     v.push(x);
-        // }
+        // // if let Some(x)=self.get_note() {
+        // //     v.push(x);
+        // // }
+
+        if let Some(notes)=self.cur_notes.get(&note_type) {
+            v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+        }
 
         v.into_iter()
     }
     pub fn filter_named_notes<T:Any>(&self, name:&'a str) -> std::vec::IntoIter<&T> {
+        let note_name=WalkNoteType::Named(name);
         let mut v: Vec<&T> = Vec::new();
 
-        if let Some(x)=self.get_named_note(name) {
-            v.push(x);
+        for ancestor in self.ancestors() {
+            if let Some(notes)=ancestor.notes.get(&note_name) {
+                v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+            }
         }
+        // v.extend(self.ancestors().filter_map(|x|x.get_named_note::<T>(name)));
 
-        v.extend(self.ancestors().filter_map(|x|x.get_named_note::<T>(name)));
+        // // for x in self.ancestors().filter_map(|x|x.get_named_note::<T>(name)) {
+        // //     v.push(x);
+        // // }
 
-        // for x in self.ancestors().filter_map(|x|x.get_named_note::<T>(name)) {
+        // if let Some(x)=self.get_named_note(name) {
         //     v.push(x);
         // }
 
+        if let Some(notes)=self.cur_notes.get(&note_name) {
+            v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+        }
+        
         v.into_iter()
     }
     // pub fn find_note_map<T:Any>(&self, 
@@ -389,7 +464,7 @@ struct Work<'a> {
     exit_order:usize,
     visiteds:HashSet<(Option<&'a Path>, usize)>,
     // note : Option<Rc<dyn Any>>,
-    notes : HashMap<WalkNoteType<'a>,Rc<dyn Any>>,
+    notes : HashMap<WalkNoteType<'a>,Vec<Rc<dyn Any>>>,
 }
 
 pub fn traverse<'a,E:Debug>(
