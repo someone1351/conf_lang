@@ -183,7 +183,11 @@ pub fn parse_start<'a>(
             }
         }
 
-        if parse_ending(lexer) || parse_ml_cmnt(lexer) || parse_cmnt(lexer) {
+        if parse_ending(lexer) 
+            || parse_ml_cmnt(lexer,"#!","!#") 
+            || parse_ml_cmnt(lexer,"#>","<#")
+            || parse_cmnt(lexer) 
+            {
             continue;
         }
         
@@ -1414,7 +1418,7 @@ fn parse_cmnt(lexer : &mut Lexer
 
 
 
-fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
+fn parse_ml_cmnt(lexer : &mut Lexer,start:&str,end:&str) -> bool {
     // ml_cmnt => spc? "#!" (^"!#"|"\\!")* "!#" ending
  
     //
@@ -1426,7 +1430,7 @@ fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
 
     //
     
-    if lexer.has(0, ["#!"]).is_none() {
+    if lexer.has(0, [start]).is_none() {
         lexer.pop_discard();
         lexer.debug_label_pop();
         return false;
@@ -1434,14 +1438,18 @@ fn parse_ml_cmnt(lexer : &mut Lexer) -> bool {
 
     lexer.skip(2);
 
+    
+    let end0=end.chars().next().unwrap().to_string();
+
     //
-    while (lexer.has(0, ["!#"]).is_none() && lexer.skip(1).is_some()) 
-        || (lexer.has(0, ["\\!"]).is_some() && lexer.skip(2).is_some()) 
+    while (lexer.has(0, [end]).is_none() && lexer.skip(1).is_some()) 
+        // || (lexer.has(0, ["\\!"]).is_some() && lexer.skip(2).is_some()) 
+        || (lexer.has(0, ["\\"]).is_some() && lexer.has(1, [end0.as_str()]).is_some() && lexer.skip(2).is_some())
     {
     }
 
     //
-    if lexer.has(0, ["!#"]).is_none() {
+    if lexer.has(0, [end]).is_none() {
         lexer.pop_discard();
         lexer.debug_label_pop();
         return false;
