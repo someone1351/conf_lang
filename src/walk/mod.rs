@@ -370,7 +370,7 @@ impl<'b,'a> Walk<'b,'a> {
             return x;
         }
 
-        self.ancestors().rev().find_map(|x|x.get_note())
+        self.ancestors.iter().rev().find_map(|x|x.get_note())
         // let note_type=WalkNoteType::Typed(std::any::TypeId::of::<T>());
 
         // self.ancestors().rev().find_map(|x|x.notes.get(&note_type).map(|x|x.iter().rev().find_map(f)))
@@ -382,7 +382,7 @@ impl<'b,'a> Walk<'b,'a> {
             return x;
         }
 
-        self.ancestors().rev().find_map(|x|x.get_named_note(name))
+        self.ancestors.iter().rev().find_map(|x|x.get_named_note(name))
     }
 
     pub fn filter_notes<T:Any>(&self) -> std::vec::IntoIter<&T> {
@@ -390,7 +390,7 @@ impl<'b,'a> Walk<'b,'a> {
 
         let mut v: Vec<&T> = Vec::new();
 
-        for ancestor in self.ancestors() {
+        for ancestor in self.ancestors.iter() {
             if let Some(notes)=ancestor.notes.get(&note_type) {
                 v.extend(notes.iter().filter_map(|y|y.downcast_ref::<T>()));
             }
@@ -415,7 +415,11 @@ impl<'b,'a> Walk<'b,'a> {
         let note_name=WalkNoteType::Named(name);
         let mut v: Vec<&T> = Vec::new();
 
-        for ancestor in self.ancestors() {
+        println!("===");
+        
+        // println!("{:?}",self.ancestors.iter().map(|x|x.depth()).collect::<Vec<_>>());
+        for ancestor in self.ancestors.iter() {
+            // println!("ancestor depth is {}",ancestor.depth());
             if let Some(notes)=ancestor.notes.get(&note_name) {
                 v.extend(notes.iter().filter_map(|y|y.downcast_ref::<T>()));
             }
