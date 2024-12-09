@@ -392,7 +392,7 @@ impl<'b,'a> Walk<'b,'a> {
 
         for ancestor in self.ancestors() {
             if let Some(notes)=ancestor.notes.get(&note_type) {
-                v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+                v.extend(notes.iter().filter_map(|y|y.downcast_ref::<T>()));
             }
         }
         // v.extend(self.ancestors().filter_map(|x|x.get_note::<T>()));
@@ -406,7 +406,7 @@ impl<'b,'a> Walk<'b,'a> {
         // // }
 
         if let Some(notes)=self.cur_notes.get(&note_type) {
-            v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+            v.extend(notes.iter().filter_map(|y|y.downcast_ref::<T>()));
         }
 
         v.into_iter()
@@ -417,7 +417,7 @@ impl<'b,'a> Walk<'b,'a> {
 
         for ancestor in self.ancestors() {
             if let Some(notes)=ancestor.notes.get(&note_name) {
-                v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+                v.extend(notes.iter().filter_map(|y|y.downcast_ref::<T>()));
             }
         }
         // v.extend(self.ancestors().filter_map(|x|x.get_named_note::<T>(name)));
@@ -431,7 +431,7 @@ impl<'b,'a> Walk<'b,'a> {
         // }
 
         if let Some(notes)=self.cur_notes.get(&note_name) {
-            v.extend(notes.iter().map(|y|y.downcast_ref::<T>().unwrap()));
+            v.extend(notes.iter().filter_map(|y|y.downcast_ref::<T>()));
         }
         
         v.into_iter()
