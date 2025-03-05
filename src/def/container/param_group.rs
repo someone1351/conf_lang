@@ -23,7 +23,12 @@ impl<'a> ParamGroupContainer<'a> {
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
         param_group.optional
     }
-    
+    pub fn param_optional(&self) -> Option<usize> {
+        let node=self.def.nodes.get(self.node_ind).unwrap();
+        let param_group=node.param_groups.get(self.param_group_ind).unwrap();
+        param_group.param_optional
+    }
+
     // pub fn param_group(&self) -> bool {
     //     let node=self.def.nodes.get(self.node_ind).unwrap();
     //     let param_group=node.params.get(self.param_ind).unwrap();
@@ -42,22 +47,32 @@ impl<'a> ParamGroupContainer<'a> {
         param_group.params.len()
     }
 
-    pub fn param(&self,item_ind:usize,val:&str) -> Option<Box<dyn Any+Send+Sync>> {
+    pub fn param_run(&self,item_ind:usize,val:&str) -> Option<Box<dyn Any+Send+Sync>> {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
         let param=param_group.params.get(item_ind);
 
-        // param.and_then(|x|*x).map(|x|x.2).and_then(|func|func(val))        
+        // param.and_then(|x|*x).map(|x|x.2).and_then(|func|func(val))
         // param.and_then(|x|x.as_ref()).map(|x|x.2.as_ref()).and_then(|func|func(val))
 
-        param.and_then(|x|*x).map(|param_ind|self.def.params.get(param_ind).unwrap().2.as_ref()).and_then(|func|func(val))
+        //what about the param any, ie None, no func? any's aren't checked from here
+        // println!("= {val:?} {} {} {}",
+        //     param.and_then(|param_ind|*param_ind).is_some(),
+        //     param.and_then(|param_ind|*param_ind).map(|param_ind|self.def.params.get(param_ind).unwrap().2.as_ref()).is_some(),
+        //     param.and_then(|param_ind|*param_ind).map(|param_ind|self.def.params.get(param_ind).unwrap().2.as_ref()).and_then(|func|func(val)).is_some(),
+        // );
+
+        param
+            .and_then(|param_ind|*param_ind)
+            .map(|param_ind|self.def.params.get(param_ind).unwrap().2.as_ref())
+            .and_then(|func|func(val))
     }
 
     pub fn param_type_id(&self,item_ind:usize) -> Option<TypeId> {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
         let param=param_group.params.get(item_ind);
-        
+
         // param.and_then(|x|*x).map(|x|x.0)
         // param.and_then(|x|x.as_ref()).map(|x|x.0)
         param.and_then(|x|*x).map(|param_ind|self.def.params.get(param_ind).unwrap().0)
@@ -66,13 +81,13 @@ impl<'a> ParamGroupContainer<'a> {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
         let param=param_group.params.get(item_ind);
-        
+
         // param.and_then(|x|*x).map(|x|x.1)
         // param.and_then(|x|x.as_ref()).map(|x|x.1)
         param.and_then(|x|*x).map(|param_ind|self.def.params.get(param_ind).unwrap().1)
-    
+
     }
-    
+
     // pub fn params_eq(&self,other:ParamGroupContainer) -> bool {
     //     if self.params_num()!=other.params_num() {
     //         return false;

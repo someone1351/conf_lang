@@ -6,13 +6,13 @@ fn walk_test1_def() -> conf_lang::Def {
     conf_lang::Def::new()
         .branch("root_branch")
             .tag_nodes(["text"])
-                .entry_text(None) 
+                .entry_text(None)
             .tag_nodes(["include"])
                 .entry(None)
                     .param_any()
             .tag_nodes(["hello"])
                 .rentry_children(None,"root_branch")
-                    .group(Some("ints"),true,true) 
+                    .group(Some("ints"),true,true)
                         .param_parse::<i32>()
                         .param_parse::<i32>()
                     .group(Some("the opt int"),true,false)
@@ -46,28 +46,11 @@ fn walk_test1() {
     };
 
     let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
-        // walk.set_note(format!("note is {} @ {}",walk.record().tag().unwrap_or("_"),walk.depth()));
 
         walk.do_exit();
         let record=walk.record();
         println!("{}",get_record_info(&walk));
-        // // println!("===== {:?}",record.ancestors().map(|x|x.tag().unwrap_or_default()).collect::<Vec<_>>());
-        // // println!("===== {:?}",record.get_parent().map(|x|x.tag().unwrap_or_default()));
-        
-        // println!("===== {} ::: {}",walk.ancestors().map(|x|format!("{}.'{}';{:?}",
-        //     x.record().tag().unwrap_or("_"),
-        //     x.record().values().map(|y|y.str()).collect::<Vec<_>>().join(", "),
-        //     x.get_note::<String>(),
-        // )).collect::<Vec<_>>().join(", "), walk.ancestors_num());
 
-        // println!("===== {:?} :: {}",walk.ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.ancestors_num());
-        // println!("===== {:?} :: {}",walk.record().ancestors().map(|x|x.tag().unwrap_or("_")).collect::<Vec<_>>().join(", "), walk.record().ancestors().count());
-
-        // walk.set_note("note".to_string());
-        // if let Some(x)=walk.get_note::<String>() {
-        //     println!("\tfrom: {x}");
-        // }
-        
         if let Some(x)=walk.get_named_note::<String>("from") {
             println!("\tfrom: {x}");
         }
@@ -76,40 +59,18 @@ fn walk_test1() {
                 let mut include_path=record.path().unwrap().to_path_buf();
                 include_path.pop();
                 include_path.push(record.value(0).str());
-    
+
                 return if let Some(conf_data)=confs.get(&include_path) {
-                    // walk.extend(conf_data.0.root());
-                    // walk.extend(conf_data.0.root().children());
-                    // walk.set_extend_note(format!("{}",include_path.to_str().unwrap()));
-                    // walk.set_extend_named_note("from",format!("{}",include_path.to_str().unwrap()));
                     walk.set_named_note("from",format!("{}",include_path.to_str().unwrap()));
                     walk.extend(conf_data.0.root().children(),);
-                    // walk.extend_children(conf_data.0.root().children());
-                    
-                    // for child in conf_data.0.root().children() {
-                    //     walk.insert(child);
-                    // }
 
-                    // for child in confs.get(&PathBuf::from("examples/test1/other_test2.conf")).unwrap().0.root().children() {
-                    //     walk.insert(child);
-                    // }
-
-                    // walk.insert(conf_data.0.root());
-                    // walk.insert(confs.get(&PathBuf::from("examples/test1/other_test2.conf")).unwrap().0.root());
-                    // Ok(Some(conf_data.0.root()))
                     Ok(())
                 } else {
-                    Err(
-                        walk.error("include file not found")
-                        //WalkError::from_record(record, "include file not found" )
-                        //("include file not found",Some(record.value(0).start_loc()))
-                        )
+                    Err(walk.error("include file not found"))
                 };
             }
             Some("hello") if walk.is_enter() => {
                 println!("    {}",get_group_vals_info(record));
-                // println!("    the int values are: {}",record.param_group("ints").values().parsed::<i32>().map(|x|format!("{x:?}")).collect::<Vec<_>>().join(", "));
-                // println!("    any val is {:?}",record.param_group("the any").value(0).str());
             }
             Some("functest") if walk.is_enter() => {
                 // println!("    functest: {:?}",record.values().parsed().collect::<Vec<i32>>());
@@ -130,42 +91,34 @@ fn walk_test1() {
 
 fn walk_test2() {
     let def = conf_lang::Def::new()
-        .param_parse::<i32>()
-        .param_parse::<i32>()
+        .group(None, false, true)
+            .param_parse::<i32>()
+            .optional()
+            .param_parse::<i32>()
+            // .param_any()
+        // .group(None, false, false)
+        //     .optional()
+        //     .param_parse::<i32>()
+        //     .param_parse::<i32>()
         ;
-
-    // let def = conf_lang::Def::new()
-    //     .group(None,false,false)
-    //         .parse::<i32>()
-    //         .parse::<i32>()
-    //     ;
-
-    // let def = conf_lang::Def::new()
-    //     .entry(None)
-    //         .parse::<i32>()
-    //         .parse::<i32>()
-    //     ;
-
-    // let def = conf_lang::Def::new()
-    //     .branch("a")
-    //         .parse::<f32>()
-    //     .branch("b")
-    //         .parse::<bool>()
-    //     .branch("a")
-    //         .entry(None)
-    //             .parse::<i32>()
-    //             .parse::<i32>()
-    //     ;
-
+    // let x = 4 %0;
     let confs=load_confs(def,"examples/test2");
-
-    let Some(test_conf)=confs.get(&PathBuf::from("examples/test2/test.conf")) else {
-        return;
-    };
+    let Some(test_conf)=confs.get(&PathBuf::from("examples/test2/test.conf")) else { return; };
 
     let res=test_conf.0.root().walk( |walk|{
-        // walk.skip_exit();
-        println!("{}",get_record_info(&walk));
+        // println!("{}",get_record_info(&walk));
+        let mut all_values: Vec<Vec<&str>> = Vec::new();
+
+        for group_ind in 0..walk.record().param_groups_num() {
+            let group=walk.record().param_group(group_ind);
+            let group_values=group.values().map(|v|v.str()).collect::<Vec<_>>();
+            all_values.push(group_values);
+        }
+
+        println!("{all_values:?}");
+        //walk.record().param_groups_num(),
+        // println!("= {}",group.);
+
     });
 
     if let Err(e)=res {
@@ -174,8 +127,8 @@ fn walk_test2() {
 }
 
 fn main() {
-    walk_test1();
-    println!("===");
+    // walk_test1();
+    // println!("===");
     walk_test2();
 }
 

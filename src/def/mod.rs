@@ -15,7 +15,7 @@ pub struct Def {
     branches : Vec<Branch>,
     branch_map : HashMap<String,usize>, //Option<String>
     nodes : Vec<Node>,
-    
+
     params : Vec<Param>,
 
     cur_branch_ind : usize,
@@ -79,8 +79,8 @@ impl Def {
         self
     }
 
-    pub fn include<'a,B>(mut self, branch_names : B) -> Self 
-    where 
+    pub fn include<'a,B>(mut self, branch_names : B) -> Self
+    where
         B :IntoIterator<Item = &'a str>
     { //from branch_nodes_from
         //
@@ -91,7 +91,7 @@ impl Def {
         //
         // let cur_branch = self.branches.last_mut().unwrap();
         let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
-        
+
         for branch_name in branch_names.into_iter() {
             cur_branch.branch_inserts.push(branch_name.to_string());
         }
@@ -103,7 +103,7 @@ impl Def {
         //
         self
     }
-    
+
     pub fn tagless_nodes(mut self, ) -> Self {
         //
         if self.branches.is_empty() {
@@ -127,16 +127,16 @@ impl Def {
         if self.branches.is_empty() {
             self.branches.push(Default::default());
         }
-        
+
         //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
-        self.for_tag_names.clear();        
+        self.for_tag_names.clear();
         self.for_tag_names.extend(tag_names.into_iter().map(|x|x.to_string()));
         self.tags_once=once;
 
     }
 
-    pub fn tag_nodes<'t,T>(mut self, tag_names: T) -> Self 
+    pub fn tag_nodes<'t,T>(mut self, tag_names: T) -> Self
     where
         T:IntoIterator<Item = &'t str>,
     {
@@ -144,7 +144,7 @@ impl Def {
         self
     }
 
-    pub fn tag_nodes_once<'t,T>(mut self, tag_names: T) -> Self 
+    pub fn tag_nodes_once<'t,T>(mut self, tag_names: T) -> Self
     where
         T:IntoIterator<Item = &'t str>,
     {
@@ -163,7 +163,7 @@ impl Def {
         //
         // let branch_ind=self.branches.len()-1;
         // let cur_branch = self.branches.last_mut().unwrap();
-        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();     
+        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
 
         //
         self.cur_nodes_start = self.nodes.len();
@@ -237,12 +237,12 @@ impl Def {
 
         self
     }
-    
+
     pub fn rentry(mut self,
         label : Option<&str>,
     ) -> Self {
         self.inner_entry();
-        
+
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
@@ -257,7 +257,7 @@ impl Def {
         children : &str,
     ) -> Self {
         self.inner_entry();
-        
+
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
@@ -272,7 +272,7 @@ impl Def {
         label : Option<&str>,
     ) -> Self {
         self.inner_entry();
-        
+
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
@@ -286,7 +286,7 @@ impl Def {
     pub fn group(mut self,
         name:Option<&str>,
         optional:bool,
-        repeat:bool,    
+        repeat:bool,
     ) -> Self {
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
@@ -296,7 +296,7 @@ impl Def {
         //
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-            
+
             if !node.param_groups.last().unwrap().specified {
                 node.param_groups.pop().unwrap();
             }
@@ -313,13 +313,15 @@ impl Def {
         self
     }
 
-    fn inner_add_param_item(&mut self,param_item:Option<Param>) {        
+    fn inner_add_param_item(&mut self,param_item:Option<Param>) {
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
             self.inner_entry();
         }
 
         //
+        //any is param_item==None, so here it doesn't get added to def.params?
+        //  no later the None gets added to param_group.params
         let param_item_ind= param_item.map(|x|{
             let param_ind=self.params.len();
             self.params.push(x);
@@ -330,60 +332,69 @@ impl Def {
 
         //calc len of any repeating patterns in the param group eg (int bool int bool) => (int bool) => 2
         //bit inefficent to recalc patterns everytime a param is added, should instead do it once they are all added
+
+        //need to break pattern if there is a param_optional? or have no pattern at all?
+
         let (pattern_len,patterns_num)={
-            let mut param_types=self.nodes.last().unwrap()
-                .param_groups.last().unwrap()
-                // .params.iter().map(|x|x.map(|x|x.0))
-                // .params.iter().map(|x|x.as_ref().map(|x|x.0))
-                .params.iter().map(|&x|x.map(|param_ind|self.params.get(param_ind).unwrap().0))
-                
-                .collect::<Vec<_>>();
+            let last_group = self.nodes.last().unwrap().param_groups.last().unwrap();
 
-            // param_types.push(param_item.as_ref().map(|x|x.0));
-            param_types.push(param_item_type);
-            
-            //
-            let mut ok=false;
-            let mut pattern = vec![param_types.get(0).cloned().unwrap()];
+            if last_group.param_optional.is_some() { //if theres a optional param, don't use patterns
+                (last_group.params.len()+1,1)
+            } else {
+                let mut param_types=last_group
+                    // .params.iter().map(|x|x.map(|x|x.0))
+                    // .params.iter().map(|x|x.as_ref().map(|x|x.0))
+                    .params.iter().map(|&x|x.map(|param_ind|self.params.get(param_ind).unwrap().0))
 
-            for param_ind in 1 .. param_types.len() {
-                ok=true;
+                    .collect::<Vec<_>>();
 
-                if param_types.len()%pattern.len() !=0 {
-                    pattern.push(param_types.get(param_ind).cloned().unwrap());
-                    continue;
-                }
-        
-                for x in 1 .. param_types.len()/pattern.len() {
-                    let y=x*pattern.len();
-                    let against_range=y..y+pattern.len();
-                    let against=param_types.get(against_range).unwrap();
-        
-                    if !pattern.eq(against) {
-                        ok=false;
+                // param_types.push(param_item.as_ref().map(|x|x.0));
+                param_types.push(param_item_type);
+
+                //
+                let mut ok=false;
+                let mut pattern = vec![param_types.get(0).cloned().unwrap()];
+
+                for param_ind in 1 .. param_types.len() {
+                    ok=true;
+
+                    if param_types.len()%pattern.len() !=0 {
+                        pattern.push(param_types.get(param_ind).cloned().unwrap());
+                        continue;
+                    }
+
+                    for x in 1 .. param_types.len()/pattern.len() {
+                        let y=x*pattern.len();
+                        let against_range=y..y+pattern.len();
+                        let against=param_types.get(against_range).unwrap();
+
+                        if !pattern.eq(against) {
+                            ok=false;
+                            break;
+                        }
+                    }
+
+                    if ok {
                         break;
                     }
+
+                    pattern.push(param_types.get(param_ind).cloned().unwrap());
                 }
-        
+
                 if ok {
-                    break;
+                    (pattern.len(),param_types.len()/pattern.len())
+                } else {
+                    (param_types.len(),1)
                 }
-        
-                pattern.push(param_types.get(param_ind).cloned().unwrap());
             }
-        
-            if ok {
-                (pattern.len(),param_types.len()/pattern.len())
-            } else {
-                (param_types.len(),1)
-            }
+
         };
 
         //add param to nodes
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             let param_group=node.param_groups.last_mut().unwrap();
-            
+
             // param_group.params.push(param_item);
             param_group.params.push(param_item_ind);
             param_group.pattern_len=pattern_len;
@@ -403,10 +414,10 @@ impl Def {
         let func2=|s:&str|T::from_str(s).ok().map(|p|Box::new(p) as Box<dyn Any+Send+Sync>);
         let param_item:Option<Param>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
         self.inner_add_param_item(param_item);
-        
+
         self
     }
-    
+
     pub fn param_func<T,F>(mut self, func:F) -> Self
     where
         T:Any+Send+Sync,
@@ -416,7 +427,26 @@ impl Def {
         let func2=move|s:&str|func(s).map(|p|Box::new(p) as Box<dyn Any+Send+Sync>);
         let param_item:Option<Param>=Some((TypeId::of::<T>(),std::any::type_name::<T>(),Box::new(func2)));
         self.inner_add_param_item(param_item);
-        
+
+        self
+    }
+
+    pub fn optional(mut self) -> Self {
+        //add node if there are none set
+        if self.cur_nodes_start==self.nodes.len() {
+            self.inner_entry();
+        }
+
+        //
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+            let param_group=node.param_groups.last_mut().unwrap();
+
+            if param_group.param_optional.is_none() {
+                param_group.param_optional = Some(param_group.params.len());
+            }
+        }
+
         self
     }
 }

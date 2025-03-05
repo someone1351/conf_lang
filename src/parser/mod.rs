@@ -62,6 +62,13 @@ TODO
 
 */
 
+/*
+* patterns in groups are needed for situations like:
+(int int int int)+ (int int)+ => 1 2 3 4 5 6 7 8 => (1 2 3 4) ([4 5] [6 7])
+
+
+*/
+
 
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
@@ -81,10 +88,12 @@ use super::def::container::node_children::NodeChildrenContainer;
 use super::lexer::{Lexer, Token};
 use super::Conf;
 
-
+/*
+* if in a repeating group, and it has optional params that aren't used, then end, stop more repeating
+*/
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
-    src : &'a str, 
+    src : &'a str,
     keep_src:bool,
     path:Option<&'a Path>,
 ) -> Result<Conf,ParseError> {
@@ -110,7 +119,7 @@ pub fn parse_start<'a>(
     // ending => spc? (eol|eof)
     // eol => [\n]|[\r][\n]
     // not_eols => ^eol*
-    
+
 
     struct TempParamGroup {
         param_group_ind:usize,
@@ -126,12 +135,12 @@ pub fn parse_start<'a>(
         pub param_groups : Range<usize>,
         pub values : Range<usize>,
         pub node_label : Option<usize>,
-        pub branch_name : Option<usize>, 
+        pub branch_name : Option<usize>,
         tag:bool,
     }
 
-    let mut temp_records = vec![TempRecord { 
-        parent: None, 
+    let mut temp_records = vec![TempRecord {
+        parent: None,
         children_records: Vec::new(),
         children_text:None,
         param_groups:0..0,
@@ -156,20 +165,20 @@ pub fn parse_start<'a>(
     while !lexer.is_end() {
         if !node_children_stk.is_empty() && node_children_stk.last().unwrap().is_body() {
             let tokens=parse_body(lexer,last_indent,path)?;
-            
+
             if !tokens.is_empty() {
                 //
                 let last_record_ind=temp_records.len()-1; //records len will always be > 1
 
                 let val_start=all_values.len();
 
-                all_values.extend(tokens.into_iter().map(|token|{                            
+                all_values.extend(tokens.into_iter().map(|token|{
                     let text_ind=texts.len();
                     texts.push(token.extracted);
 
                     Value {
-                        start_loc:token.start_loc, 
-                        end_loc:token.end_loc, 
+                        start_loc:token.start_loc,
+                        end_loc:token.end_loc,
                         text_ind,
                         parsed_ind : None,
                     }
@@ -183,14 +192,14 @@ pub fn parse_start<'a>(
             }
         }
 
-        if parse_ending(lexer) 
-            || parse_ml_cmnt(lexer,"#!","!#") 
+        if parse_ending(lexer)
+            || parse_ml_cmnt(lexer,"#!","!#")
             || parse_ml_cmnt(lexer,"#>","<#")
-            || parse_cmnt(lexer) 
+            || parse_cmnt(lexer)
             {
             continue;
         }
-        
+
         //
         if let Some((indent,tokens)) = parse_record(lexer,last_indent,path)? {
             let conf_val_start=all_values.len();
@@ -206,8 +215,8 @@ pub fn parse_start<'a>(
                 };
 
                 Value {
-                    start_loc:token.start_loc, 
-                    end_loc:token.end_loc, 
+                    start_loc:token.start_loc,
+                    end_loc:token.end_loc,
                     text_ind,
                     parsed_ind: None,
                 }
@@ -236,7 +245,7 @@ pub fn parse_start<'a>(
                 root_branch
             } else {
                 match node_children_stk.last().unwrap().clone() {
-                    NodeChildrenContainer::BranchMissing(branch_name)=> { 
+                    NodeChildrenContainer::BranchMissing(branch_name)=> {
                         //is this really needed? can quietly ignore missing children branches instead?
                         //  kinda needed on that there was children found, but the branch was missing that specified the children
                         return Err(ParseError{
@@ -267,47 +276,52 @@ pub fn parse_start<'a>(
             let first_val_text=texts.get(record_vals.first().unwrap().text_ind).unwrap().clone();
 
             let mut cur_param_groups=Vec::<TempParamGroup>::new();
-            
+
             //look at nodes
             for node in cur_branch.get_tag_nodes(first_val_text.as_str()).chain(cur_branch.get_tagless_nodes()) {
 
                 cur_param_groups.clear();
-                
+
                 let record_val_start=node.has_tag().then_some(1).unwrap_or(0);
                 let record_vals_num=record_vals.len()-record_val_start;
 
                 //
                 let mut ok=true;
 
-                if node.param_groups_num()==1 {
+                if node.param_groups_num()==1 { //handle single group, more efficient then using code below in else, which would also work
                     //
                     let param_group=node.param_group(0).unwrap();
                     let params_num=param_group.params_num();
-                    
-                    //
-                    if record_vals_num==params_num 
-                        || (param_group.repeat() && params_num!=0 && record_vals_num!=0 && record_vals_num%params_num==0) 
+                    let param_optional=param_group.param_optional().unwrap_or(params_num);
+
+                    //skip on invalid params num
+                    if record_vals_num==params_num
                         || (param_group.optional() && record_vals_num==0) // && group.params_num()!=0
-                    { } else {
-                        continue;
-                    }
+                        || (param_group.repeat() && params_num!=0 && record_vals_num!=0 && record_vals_num%params_num==0)
+
+                        || ((param_group.repeat() || record_vals_num<params_num) && record_vals_num%params_num >= param_optional)
+                    {} else { continue; }
 
                     //
                     for record_val_ind in record_val_start .. record_vals.len() {
                         let record_val = record_vals.get(record_val_ind).unwrap();
                         let param_ind= (record_val_ind-record_val_start)%params_num;
-    
-                        if let Some(val_type_id) = param_group.param_type_id(param_ind) {
-                            let parsed_vals=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
-                            
+
+                        if let Some(val_type_id) = param_group.param_type_id(param_ind) { //check func, anys not checked
+                            let parsed_vals: &mut HashMap<TypeId, Option<(&str, Box<dyn Any + Send + Sync>)>>=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
+
                             let parsed_val=parsed_vals.entry(val_type_id).or_insert_with(||{
                                 let text=texts.get(record_val.text_ind).unwrap();
-                                
-                                param_group.param(param_ind, text.as_str()).map(|x|{
-                                    (param_group.param_type_name(param_ind).unwrap(),x)
+
+                                //run param func
+                                let param_result=param_group.param_run(param_ind, text.as_str());
+
+                                //
+                                param_result.map(|param_result|{
+                                    (param_group.param_type_name(param_ind).unwrap(),param_result)
                                 })
                             });
-    
+
                             if parsed_val.is_none() {
                                 ok=false;
                                 break;
@@ -315,6 +329,7 @@ pub fn parse_start<'a>(
                         }
                     }
 
+                    //
                     let group_name_text_ind= param_group.name().map(|group_name|{
                         if let Some(text_ind)=text_map.get(group_name) {
                             *text_ind
@@ -326,11 +341,11 @@ pub fn parse_start<'a>(
                         }
                     });
 
-                    cur_param_groups.push(TempParamGroup { 
+                    cur_param_groups.push(TempParamGroup {
                         param_group_ind:0,
-                        conf_param_group:conf::ParamGroup { 
-                            conf_values: conf_val_start+record_val_start..all_val_end, 
-                            name: group_name_text_ind, 
+                        conf_param_group:conf::ParamGroup {
+                            conf_values: conf_val_start+record_val_start..all_val_end,
+                            name: group_name_text_ind,
                             params_num,
                             optional:param_group.optional(),
                             repeat:param_group.repeat(),
@@ -344,7 +359,7 @@ pub fn parse_start<'a>(
                     while record_val_ind<record_vals.len() {
                         //println!("==while g={param_group_ind}: v={record_val_ind}");
                         let param_group=node.param_group(param_group_ind).unwrap();
-                    
+
                         //some might not have any params and are invalid
                         if param_group.params_num()==0 {
                             ok=false; //not really necessary?
@@ -368,8 +383,8 @@ pub fn parse_start<'a>(
                                 if param_group.params_pattern_len()==param_group2.params_pattern_len() {
                                     let mut i=0;
 
-                                    while i<param_group.params_pattern_len() 
-                                        && param_group.param_type_id(i)==param_group2.param_type_id(i) 
+                                    while i<param_group.params_pattern_len()
+                                        && param_group.param_type_id(i)==param_group2.param_type_id(i)
                                     {
                                         i+=1;
                                     }
@@ -378,7 +393,7 @@ pub fn parse_start<'a>(
                                         break;
                                     }
                                 }
-                              
+
                                 if !param_group2.optional() {
                                     needed_tuple_count+=param_group2.params_patterns_num();
                                 } else {
@@ -396,11 +411,11 @@ pub fn parse_start<'a>(
 
                             //needed_tuple_count total_tuple_count
                             //println!("\tadj_param_groups_num={adj_param_groups_num}");
-                            
+
                             //on more than one adj param group with same pattern
                             if adj_param_groups_num>1 {
                                 let mut record_val_ind2=record_val_ind;
-                                
+
                                 //get all record values matching pattern
                                 loop {
 
@@ -422,7 +437,7 @@ pub fn parse_start<'a>(
                                             {
                                                 let val = record_vals.get(record_val_ind2).unwrap();
                                                 let text=texts.get(val.text_ind).unwrap();
-                                                let v=param_group.param(pattern_ind, text.as_str());
+                                                let v=param_group.param_run(pattern_ind, text.as_str());
 
                                                 v.map(|v|(param_group.param_type_name(pattern_ind).unwrap(),v))
                                             }).is_some()
@@ -453,9 +468,9 @@ pub fn parse_start<'a>(
 
                                 //
                                 if needed_tuple_count*param_group.params_pattern_len() <= found_vals_num && (
-                                    has_repeat 
-                                    || needed_tuple_count*param_group.params_pattern_len() == found_vals_num 
-                                    || total_tuple_count*param_group.params_pattern_len() == found_vals_num 
+                                    has_repeat
+                                    || needed_tuple_count*param_group.params_pattern_len() == found_vals_num
+                                    || total_tuple_count*param_group.params_pattern_len() == found_vals_num
                                 ) {
                                     //println!("-------tryyyy");
 
@@ -465,10 +480,10 @@ pub fn parse_start<'a>(
                                     //int* int? int? int
                                     //int? int* int
                                     //int int* int?
-                                    
+
                                     let mut tuple_assigns= Vec::new(); //(0..(param_group_ind2-param_group_ind)).
                                     tuple_assigns.resize(adj_param_groups_num, 0);
-                                    
+
                                     let mut remaining_tuple_count= (found_vals_num/param_group.params_pattern_len())-needed_tuple_count;
                                     //println!("remaining_tuple_count={remaining_tuple_count}");
                                     //println!("--hm1 {}-{needed_tuple_count} ={remaining_tuple_count} ",found_vals_num/param_group.params_pattern_len());
@@ -496,7 +511,7 @@ pub fn parse_start<'a>(
                                                 remaining_tuple_count-=params_patterns_num;
                                             }
                                         }
-                                        
+
                                     }
 
                                     //
@@ -518,18 +533,18 @@ pub fn parse_start<'a>(
                                                     text_ind
                                                 }
                                             });
-    
+
                                             //
                                             //println!("record_val_ind {record_val_ind} + {tuple_assign}*{}",param_group2.params_num());
                                             let record_val_num =tuple_assign*param_group2.params_pattern_len();
-    
+
                                             //println!("!!! record_val_ind {record_val_ind}, record_val_num {record_val_num}");
                                             //
-                                            cur_param_groups.push(TempParamGroup { 
+                                            cur_param_groups.push(TempParamGroup {
                                                 param_group_ind:param_group_ind2,
-                                                conf_param_group:conf::ParamGroup { 
-                                                    conf_values: conf_val_start+record_val_ind..conf_val_start+record_val_ind+record_val_num, 
-                                                    name: group_name_text_ind, 
+                                                conf_param_group:conf::ParamGroup {
+                                                    conf_values: conf_val_start+record_val_ind..conf_val_start+record_val_ind+record_val_num,
+                                                    name: group_name_text_ind,
                                                     params_num: param_group2.params_num(),
                                                     optional:param_group2.optional(),
                                                     repeat:param_group2.repeat(),
@@ -537,16 +552,15 @@ pub fn parse_start<'a>(
                                             });
 
                                             record_val_ind+=record_val_num;
-    
+
                                         }
-                                        
+
                                         param_group_ind=param_group_ind2;
                                         continue;
                                     } else {
                                         //println!("---no {remaining_tuple_count} {tuple_assigns:?}");
                                     }
                                 }
-
 
                                 //
                             }
@@ -563,7 +577,7 @@ pub fn parse_start<'a>(
                             loop { //for repeats
                                 //println!("==loop repeat {record_val_ind}, {record_val_ind2}");
                                 let mut record_val_ind3=record_val_ind2;
-                                
+
                                 //get vals for params
                                 for param_ind in 0..param_group.params_num() {
                                     //
@@ -574,8 +588,8 @@ pub fn parse_start<'a>(
                                         {
                                             let val = record_vals.get(record_val_ind3).unwrap();
                                             let text=texts.get(val.text_ind).unwrap();
-                                            let v=param_group.param(param_ind, text.as_str());
-                                            
+                                            let v=param_group.param_run(param_ind, text.as_str());
+
                                             v.map(|v|(param_group.param_type_name(param_ind).unwrap(),v))
                                         }).is_some()
                                     }).unwrap_or(true);
@@ -594,7 +608,7 @@ pub fn parse_start<'a>(
                                     record_val_ind2=record_val_ind3;
                                     many_count+=1;
 
-                                    if param_group.repeat() && record_val_ind3<record_vals.len() { 
+                                    if param_group.repeat() && record_val_ind3<record_vals.len() {
                                         continue;
                                     }
                                 } else if !param_group.optional() && (!param_group.repeat() || many_count==0) {
@@ -603,7 +617,7 @@ pub fn parse_start<'a>(
                                 }
 
                                 //
-                                break; 
+                                break;
                             } //end loop
 
                             //
@@ -619,8 +633,8 @@ pub fn parse_start<'a>(
 
                             //
                             //after completing a param group, store it
-                            // if last_param_group_ind!=param_group_ind 
-                            { 
+                            // if last_param_group_ind!=param_group_ind
+                            {
                                 //
                                 let group_name_text_ind= param_group.name().map(|group_name|{
                                     if let Some(text_ind)=text_map.get(group_name) {
@@ -637,19 +651,19 @@ pub fn parse_start<'a>(
                                 let conf_values=if many_count!=0 {conf_val_start+record_val_ind..conf_val_start+record_val_ind2} else {0..0};
 
                                 //
-                                cur_param_groups.push(TempParamGroup { 
+                                cur_param_groups.push(TempParamGroup {
                                     param_group_ind,
-                                    conf_param_group:conf::ParamGroup { 
-                                        conf_values, 
-                                        name: group_name_text_ind, 
-                                        params_num: param_group.params_num(), 
+                                    conf_param_group:conf::ParamGroup {
+                                        conf_values,
+                                        name: group_name_text_ind,
+                                        params_num: param_group.params_num(),
                                         optional:param_group.optional(),
                                         repeat:param_group.repeat(),
                                     }
                                 });
                             }
 
-                            if many_count!=0 { 
+                            if many_count!=0 {
                                 record_val_ind=record_val_ind2;
                                 //println!("====5 {record_val_ind}={record_val_ind2}");
                             }
@@ -673,8 +687,8 @@ pub fn parse_start<'a>(
 
                             // println!("group2 is {:?}, ",param_group.name());
 
-                            
-                            { 
+
+                            {
                                 //
                                 let group_name_text_ind= param_group.name().map(|group_name|{
                                     if let Some(text_ind)=text_map.get(group_name) {
@@ -686,25 +700,25 @@ pub fn parse_start<'a>(
                                         text_ind
                                     }
                                 });
- 
+
                                 //
-                                cur_param_groups.push(TempParamGroup { 
+                                cur_param_groups.push(TempParamGroup {
                                     param_group_ind,
-                                    conf_param_group:conf::ParamGroup { 
-                                        conf_values:0..0, 
-                                        name: group_name_text_ind, 
-                                        params_num: param_group.params_num(), 
+                                    conf_param_group:conf::ParamGroup {
+                                        conf_values:0..0,
+                                        name: group_name_text_ind,
+                                        params_num: param_group.params_num(),
                                         optional:param_group.optional(),
                                         repeat:param_group.repeat(),
                                     }
                                 });
                             }
-                            
+
                             param_group_ind+=1;
                         }
-                        
+
                         //failed to go through all record vals or failed to go through all param groups
-                        if record_val_ind!=record_vals.len() || param_group_ind!=node.param_groups_num() { 
+                        if record_val_ind!=record_vals.len() || param_group_ind!=node.param_groups_num() {
                             ok=false;
                             // println!("a3 {} {}, {} {}",
                             //     record_val_ind,record_vals.len(),
@@ -718,8 +732,8 @@ pub fn parse_start<'a>(
                 if ok && node.has_tag() && node.tag_once() && tags_useds.last().unwrap().contains(&first_val_text) {
                     return Err(ParseError {
                         path:path.map(|p|p.to_path_buf()),
-                        loc: record_vals.first().unwrap().start_loc, 
-                        error_type: ParseErrorType::TagOnce(first_val_text.clone()), 
+                        loc: record_vals.first().unwrap().start_loc,
+                        error_type: ParseErrorType::TagOnce(first_val_text.clone()),
                     });
                 }
 
@@ -765,7 +779,7 @@ pub fn parse_start<'a>(
                             // println!("\t\t:{:?}",parsed_vals.iter().map(|x|x.1.is_some()).collect::<Vec<_>>());
                             let parsed_val=parsed_vals.remove(&type_id).unwrap();
                             let value=all_values.get_mut(conf_val_start+record_val_ind).unwrap();
-                            
+
                             value.parsed_ind=Some(all_parsed_values.len());
                             // println!(" parsedind={:?}",value.parsed_ind);
                             all_parsed_values.push(parsed_val.unwrap());
@@ -784,8 +798,8 @@ pub fn parse_start<'a>(
 
             //
             node_children_stk.push(node.children());
-        
-            //            
+
+            //
             let branch_name=cur_branch.name().unwrap_or_default().to_string();
             let node_label=node.label().map(|x|x.to_string());
 
@@ -808,17 +822,17 @@ pub fn parse_start<'a>(
                     text_ind
                 }
             });
-            
+
             //
             let record_ind=temp_records.len();
 
-            temp_records.push(TempRecord { 
+            temp_records.push(TempRecord {
                 branch_name:Some(branch_name_text_ind),
                 node_label:node_label_text_ind,
                 param_groups:param_groups_start..param_groups_end,
                 values : conf_val_start..all_val_end,
-                parent:Some(cur_parent), 
-                children_records:Vec::new(), 
+                parent:Some(cur_parent),
+                children_records:Vec::new(),
                 children_text:None,
                 tag:node.has_tag(),
             });
@@ -828,7 +842,7 @@ pub fn parse_start<'a>(
             //
             continue;
         }
-        
+
         //
         if !lexer.is_end() {
             lexer.debug_label_pop();
@@ -845,14 +859,14 @@ pub fn parse_start<'a>(
     lexer.debug_label_pop();
 
     //
-    let mut records = vec![Record { 
+    let mut records = vec![Record {
         param_groups:0..0,
-        conf_values: 0..0, 
-        parent: None, 
-        children: 0..0, 
+        conf_values: 0..0,
+        parent: None,
+        children: 0..0,
         children_text:false,
-        node_label: None, 
-        branch_name: None, 
+        node_label: None,
+        branch_name: None,
         tag:false,
     }];
 
@@ -861,34 +875,34 @@ pub fn parse_start<'a>(
     while let Some((temp_record_ind,record_ind))= stk.pop() {
         let temp_record=temp_records.get(temp_record_ind).unwrap();
         let record_children_start = records.len();
-        
+
         for &child_temp_record_ind in temp_record.children_records.iter() {
             let child_temp_record=temp_records.get(child_temp_record_ind).unwrap();
 
-            records.push(Record { 
-                parent: Some(record_ind), 
-                children: child_temp_record.children_text.clone().unwrap_or(0..0), 
+            records.push(Record {
+                parent: Some(record_ind),
+                children: child_temp_record.children_text.clone().unwrap_or(0..0),
                 children_text:child_temp_record.children_text.is_some(),
                 param_groups:child_temp_record.param_groups.clone(),
-                conf_values: child_temp_record.values.clone(), 
-                node_label: child_temp_record.node_label, 
+                conf_values: child_temp_record.values.clone(),
+                node_label: child_temp_record.node_label,
                 branch_name: child_temp_record.branch_name,
                 tag:child_temp_record.tag,
             });
         }
-        
+
         if !temp_record.children_records.is_empty() {
             let record_children_end = records.len();
             let record=records.get_mut(record_ind).unwrap();
             record.children=record_children_start .. record_children_end;
         }
- 
+
         stk.extend(temp_record.children_records.iter().enumerate()
             .map(|(i,&child_temp_record_ind)|(child_temp_record_ind,record_children_start+i)));
     }
-    
+
     //
-    
+
     let mut param_group_name_map = HashMap::new();
 
     for param_group in all_param_groups.iter() {
@@ -905,7 +919,7 @@ pub fn parse_start<'a>(
     for (record_ind,record) in records.iter().enumerate() {
         for param_group_ind in record.param_groups.clone() {
             let param_group=all_param_groups.get(param_group_ind).unwrap();
-            
+
             if let Some(text_ind)=param_group.name {
                 param_group_map.insert((text_ind,record_ind), param_group_ind);
             }
@@ -913,13 +927,13 @@ pub fn parse_start<'a>(
     }
 
     //
-    Ok(Conf { 
-        records, 
-        texts, 
+    Ok(Conf {
+        records,
+        texts,
         path: path.and_then(|x|Some(x.to_path_buf())),
         // src : src.and_then(|x|Some(x.to_string())),
         src:keep_src.then(||src.to_string()),
-        values: all_values, 
+        values: all_values,
         param_groups:all_param_groups,
         param_group_map,
         param_group_name_map,
@@ -1035,7 +1049,7 @@ fn parse_body<'a>(lexer : &mut Lexer,last_indent:usize,
         }
 
         lexer.pop_keep();
-        
+
         //
         if parse_not_eols(lexer,false) {
             tokens.push(lexer.token().unwrap());
@@ -1060,7 +1074,7 @@ fn parse_val<'a>(lexer : &mut Lexer,
     let quotes=["'","\"","`"];
 
     lexer.debug_label_push("val");
-    
+
     //
     for tripple in [true,false] {
         for &quote in quotes.iter() {
@@ -1184,12 +1198,12 @@ fn parse_qval<'a>(lexer : &mut Lexer,quote:&str,tripple:bool,
             loc:lexer.loc(),
             error_type:ParseErrorType::NoClosingQuote(quote2.to_string()),
         });
-        
+
         // return Err((lexer.loc(),"expected closing quote"));
     };
 
     lexer.skip(x.len());
-    
+
     //
     lexer.debug_label_pop();
     Ok(true)
@@ -1208,7 +1222,7 @@ fn parse_indent<'a>(lexer : &mut Lexer,last_indent:usize, in_body:bool,
     let mut spcs = 0;
 
     let mut i=0;
-    
+
     //
     while let Some(x)=lexer.has(i, [" ","\t"]) {
         if x=="\t" {
@@ -1279,7 +1293,7 @@ fn parse_eol(lexer : &mut Lexer,) -> bool {
         lexer.debug_label_pop();
         return true;
     }
-    
+
     //
     lexer.debug_label_pop();
     false
@@ -1300,7 +1314,7 @@ fn parse_not_eols(lexer : &mut Lexer, discard:bool) -> bool {
         } else {
             lexer.consume(1, None);
         }
-        
+
         found=true;
     }
 
@@ -1360,7 +1374,7 @@ fn parse_ending(lexer : &mut Lexer) -> bool {
 
     //
     parse_spc(lexer);
-    
+
     if !parse_eol(lexer) && !lexer.is_end() {
         lexer.pop_discard();
         lexer.debug_label_pop();
@@ -1389,7 +1403,7 @@ fn parse_cmnt(lexer : &mut Lexer
     parse_spc(lexer);
 
     //
-    
+
     if lexer.has(0, ["#"]).is_none() {
         lexer.pop_discard();
         lexer.debug_label_pop();
@@ -1420,7 +1434,7 @@ fn parse_cmnt(lexer : &mut Lexer
 
 fn parse_ml_cmnt(lexer : &mut Lexer,start:&str,end:&str) -> bool {
     // ml_cmnt => spc? "#!" (^"!#"|"\\!")* "!#" ending
- 
+
     //
     lexer.debug_label_push("ml_cmnt");
     lexer.push();
@@ -1429,7 +1443,7 @@ fn parse_ml_cmnt(lexer : &mut Lexer,start:&str,end:&str) -> bool {
     parse_spc(lexer);
 
     //
-    
+
     if lexer.has(0, [start]).is_none() {
         lexer.pop_discard();
         lexer.debug_label_pop();
@@ -1438,12 +1452,12 @@ fn parse_ml_cmnt(lexer : &mut Lexer,start:&str,end:&str) -> bool {
 
     lexer.skip(2);
 
-    
+
     let end0=end.chars().next().unwrap().to_string();
 
     //
-    while (lexer.has(0, [end]).is_none() && lexer.skip(1).is_some()) 
-        // || (lexer.has(0, ["\\!"]).is_some() && lexer.skip(2).is_some()) 
+    while (lexer.has(0, [end]).is_none() && lexer.skip(1).is_some())
+        // || (lexer.has(0, ["\\!"]).is_some() && lexer.skip(2).is_some())
         || (lexer.has(0, ["\\"]).is_some() && lexer.has(1, [end0.as_str()]).is_some() && lexer.skip(2).is_some())
     {
     }
@@ -1467,6 +1481,6 @@ fn parse_ml_cmnt(lexer : &mut Lexer,start:&str,end:&str) -> bool {
     //
     lexer.pop_keep();
     lexer.debug_label_pop();
-    
+
     true
 }

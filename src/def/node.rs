@@ -12,7 +12,8 @@ pub type Param=(std::any::TypeId,&'static str,ParamParse);
 #[derive (Default)]
 pub struct ParamGroup {
     // pub priority:i32,
-    pub optional:bool,
+    pub optional:bool, //group optional
+    pub param_optional : Option<usize>, //
     pub repeat:bool,
     // pub first:bool,
     pub name:Option<String>,
