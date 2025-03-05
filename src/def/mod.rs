@@ -335,10 +335,12 @@ impl Def {
 
         //need to break pattern if there is a param_optional? or have no pattern at all?
 
-        let (pattern_len,patterns_num)={
+        let (pattern_len,patterns_num)={ //pattern_len aka pattern_ssstuple_len
             let last_group = self.nodes.last().unwrap().param_groups.last().unwrap();
 
             if last_group.param_optional.is_some() { //if theres a optional param, don't use patterns
+                //should set patterns_num to 0? so in parser is skipped over?
+                //  check in parser if pattern_num is 0 instead of params_optional.is_none()?
                 (last_group.params.len()+1,1)
             } else {
                 let mut param_types=last_group
