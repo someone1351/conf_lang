@@ -91,14 +91,15 @@ fn walk_test1() {
 
 fn walk_test2() {
     let def = conf_lang::Def::new()
-        .group(None, false, true)
+        .group(None, false, false)
             .param_parse::<i32>()
             .optional()
             .param_parse::<i32>()
+            .param_parse::<i32>()
             // .param_any()
-        // .group(None, false, false)
+        .group(None, false, false)
         //     .optional()
-        //     .param_parse::<i32>()
+            .param_parse::<bool>()
         //     .param_parse::<i32>()
         ;
     // let x = 4 %0;

@@ -69,6 +69,10 @@ TODO
 
 */
 
+/*
+* if in a repeating group, and it has optional params that aren't used, then end, stop more repeating
+* if a param_group has optional params, then don't use with patterns? probably
+*/
 
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
@@ -88,9 +92,6 @@ use super::def::container::node_children::NodeChildrenContainer;
 use super::lexer::{Lexer, Token};
 use super::Conf;
 
-/*
-* if in a repeating group, and it has optional params that aren't used, then end, stop more repeating
-*/
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
     src : &'a str,
@@ -308,7 +309,7 @@ pub fn parse_start<'a>(
                         let param_ind= (record_val_ind-record_val_start)%params_num;
 
                         if let Some(val_type_id) = param_group.param_type_id(param_ind) { //check func, anys not checked
-                            let parsed_vals: &mut HashMap<TypeId, Option<(&str, Box<dyn Any + Send + Sync>)>>=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
+                            let parsed_vals=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
 
                             let parsed_val=parsed_vals.entry(val_type_id).or_insert_with(||{
                                 let text=texts.get(record_val.text_ind).unwrap();
@@ -361,13 +362,15 @@ pub fn parse_start<'a>(
                         let param_group=node.param_group(param_group_ind).unwrap();
 
                         //some might not have any params and are invalid
+                        //  should ignore (skip over) if no params?
                         if param_group.params_num()==0 {
                             ok=false; //not really necessary?
                             break;
                         }
 
                         //handle adjacent param groups that share a pattern
-                        if param_group.optional() || param_group.repeat() {
+                        //  do not use patterns when using param_optional
+                        if param_group.param_optional().is_none() && (param_group.optional() || param_group.repeat()) {
                             let mut has_repeat=param_group.repeat();
                             let mut param_group_ind2=param_group_ind+1;
 
@@ -378,6 +381,11 @@ pub fn parse_start<'a>(
                             //count num of param tuples matching the pattern in param groups
                             while param_group_ind2<node.param_groups_num() {
                                 let param_group2=node.param_group(param_group_ind2).unwrap();
+
+                                //do not use patterns when using param_optional
+                                if param_group2.param_optional().is_some() {
+                                    break;
+                                }
 
                                 //check the params groups have same pattern
                                 if param_group.params_pattern_len()==param_group2.params_pattern_len() {
@@ -394,6 +402,7 @@ pub fn parse_start<'a>(
                                     }
                                 }
 
+                                //
                                 if !param_group2.optional() {
                                     needed_tuple_count+=param_group2.params_patterns_num();
                                 } else {
@@ -566,10 +575,11 @@ pub fn parse_start<'a>(
                             }
                         }
 
-                        //handle param group
+                        //(else?) handle param group
                         {
                             let mut many_count=0;
                             let mut param_found=false;
+                            let mut param_optional_used=false;
                             let mut record_val_ind2=record_val_ind;
 
                             // let mut ok2=true;
@@ -598,17 +608,30 @@ pub fn parse_start<'a>(
                                     if param_found { //param matches value
                                         record_val_ind3+=1;
                                         //println!("====x {record_val_ind3}");
+                                    // } else if let Some(param_optional)=param_group.param_optional() {
+                                    //     if param_ind >=param_optional {
+                                    //         param_found=true;
+                                    //     } else {
+                                    //         break;
+                                    //     }
                                     } else {
+                                        if let Some(param_optional)=param_group.param_optional() {
+                                            if param_ind >=param_optional {
+                                                param_found=true;
+                                                param_optional_used=true;
+                                            }
+                                        }
+
                                         break;
                                     }
-                                }
+                                } //end for
 
                                 //after looping through params
                                 if param_found { //all success
                                     record_val_ind2=record_val_ind3;
                                     many_count+=1;
 
-                                    if param_group.repeat() && record_val_ind3<record_vals.len() {
+                                    if !param_optional_used && param_group.repeat() && record_val_ind3<record_vals.len() {
                                         continue;
                                     }
                                 } else if !param_group.optional() && (!param_group.repeat() || many_count==0) {
@@ -680,6 +703,7 @@ pub fn parse_start<'a>(
                         } //
                     } //end while
 
+                    //
                     if ok {
                         //skip optional param groups
                         while param_group_ind<node.param_groups_num() && node.param_group(param_group_ind).unwrap().optional() {
@@ -728,7 +752,7 @@ pub fn parse_start<'a>(
                     }
                 }
 
-                //
+                //enforce tag once (only one of the tag allowed)
                 if ok && node.has_tag() && node.tag_once() && tags_useds.last().unwrap().contains(&first_val_text) {
                     return Err(ParseError {
                         path:path.map(|p|p.to_path_buf()),
@@ -739,18 +763,18 @@ pub fn parse_start<'a>(
 
                 //
                 if ok {
-                    //
+                    //store used tags
                     if node.has_tag() {
                         tags_useds.last_mut().unwrap().insert(first_val_text.clone());
                     }
 
-                    //
+                    //store found node
                     found_node=Some(node);
                     break;
                 }
             }
 
-            //
+            //err if no found_node
             let Some(node)=found_node else {
                 return Err(ParseError{
                     path:path.map(|p|p.to_path_buf()),
