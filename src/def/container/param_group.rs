@@ -111,7 +111,7 @@ impl<'a> ParamGroupContainer<'a> {
     pub fn params_patterns_num(&self) -> usize {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
-        param_group.patterns_num
+        param_group.pattern_many
     }
     // pub fn specified(&self) -> bool {
     //     let node=self.def.nodes.get(self.node_ind).unwrap();

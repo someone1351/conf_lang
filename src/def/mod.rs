@@ -22,6 +22,7 @@ pub struct Def {
     for_tag_names : Vec<String>,
     cur_nodes_start : usize,
     tags_once:bool,
+    is_group_similar : bool,
 }
 
 impl Def {
@@ -37,6 +38,7 @@ impl Def {
             for_tag_names : Vec::new(),
             cur_nodes_start : 0,
             tags_once:false,
+            is_group_similar:false,
         }
     }
 
@@ -148,7 +150,7 @@ impl Def {
         self
     }
 
-    pub fn tag_nodes_once<'t,T>(mut self, tag_names: T) -> Self
+    pub fn tags_once<'t,T>(mut self, tag_names: T) -> Self
     where
         T:IntoIterator<Item = &'t str>,
     {
@@ -250,7 +252,7 @@ impl Def {
         }
     }
 
-    pub fn entry_label(mut self,label : &str) -> Self {
+    pub fn label_entry(mut self,label : &str) -> Self {
         self.init_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
@@ -261,12 +263,14 @@ impl Def {
         self
     }
 
-    fn inner_group(&mut self, pattern_type:GroupSimilar) {
+    fn inner_group(&mut self, group_similar:GroupSimilar) {
         self.init_entry();
+
+        self.is_group_similar=group_similar!=GroupSimilar::None;
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-            node.param_groups.push(ParamGroup{similar: pattern_type,..Default::default()});
+            node.param_groups.push(ParamGroup{similar: group_similar,..Default::default()});
         }
     }
 
@@ -288,6 +292,10 @@ impl Def {
     fn init_group(&mut self) {
         self.init_entry();
 
+        if self.cur_nodes_start == self.nodes.len() {
+            self.is_group_similar=false;
+        }
+
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
 
@@ -297,7 +305,7 @@ impl Def {
         }
     }
 
-    pub fn group_label(mut self,name:&str) -> Self {
+    pub fn label_group(mut self,name:&str) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
@@ -314,7 +322,7 @@ impl Def {
 
         self
     }
-    pub fn group_repeat(mut self) -> Self {
+    pub fn repeat_group(mut self) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
@@ -331,7 +339,7 @@ impl Def {
 
         self
     }
-    pub fn group_optional(mut self) -> Self {
+    pub fn optional_group(mut self) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
@@ -349,6 +357,80 @@ impl Def {
         self
     }
 
+    fn inner_param_pattern(&mut self, param_item_ind: Option<usize>) -> (usize,usize) {
+        //also should be when last_group.param_optional.is_some(),
+        //  but is done in parser, maybe can impl group_similar for param_optional cases,
+        //  though not needed
+        if !self.is_group_similar {
+            return (0,0);
+        }
+
+        let param_item_type=param_item_ind.map(|param_ind|self.params.get(param_ind).unwrap().0);
+
+        //calc len of any repeating patterns in the param group eg (int bool int bool) => (int bool) => 2
+        //bit inefficent to recalc patterns everytime a param is added, should instead do it once they are all added
+
+        //need to break pattern if there is a param_optional? or have no pattern at all?
+
+        let (pattern_len,pattern_many)={ //pattern_len aka pattern_ssstuple_len
+            let last_group = self.nodes.last().unwrap().param_groups.last().unwrap();
+
+            // if last_group.param_optional.is_some() { //if theres a optional param, don't use patterns
+            //     //should set patterns_num to 0? so in parser is skipped over?
+            //     //  check in parser if pattern_num is 0 instead of params_optional.is_none()?
+            //     (last_group.params.len()+1,1)
+            // } else
+            // {
+
+            // }
+            let mut param_types=last_group
+                // .params.iter().map(|x|x.map(|x|x.0))
+                // .params.iter().map(|x|x.as_ref().map(|x|x.0))
+                .params.iter().map(|&x|x.map(|param_ind|self.params.get(param_ind).unwrap().0)).collect::<Vec<_>>();
+
+            // param_types.push(param_item.as_ref().map(|x|x.0));
+            param_types.push(param_item_type);
+
+            //
+            let mut ok=false;
+            let mut pattern = vec![param_types.get(0).cloned().unwrap()];
+
+            for param_ind in 1 .. param_types.len() {
+                ok=true;
+
+                if param_types.len()%pattern.len() !=0 {
+                    pattern.push(param_types.get(param_ind).cloned().unwrap());
+                    continue;
+                }
+
+                for x in 1 .. param_types.len()/pattern.len() {
+                    let y=x*pattern.len();
+                    let against_range=y..y+pattern.len();
+                    let against=param_types.get(against_range).unwrap();
+
+                    if !pattern.eq(against) {
+                        ok=false;
+                        break;
+                    }
+                }
+
+                if ok {
+                    break;
+                }
+
+                pattern.push(param_types.get(param_ind).cloned().unwrap());
+            }
+
+            if ok {
+                (pattern.len(),param_types.len()/pattern.len())
+            } else {
+                (param_types.len(),1)
+            }
+        };
+
+        (pattern_len,pattern_many)
+    }
+
     fn inner_add_param_item(&mut self,param_item:Option<Param>) {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
@@ -359,85 +441,26 @@ impl Def {
         //
         //any is param_item==None, so here it doesn't get added to def.params?
         //  no later the None gets added to param_group.params
-        let param_item_ind= param_item.map(|x|{
+        let param_item_ind: Option<usize>= param_item.map(|x|{
             let param_ind=self.params.len();
             self.params.push(x);
             param_ind
         });
 
-        let param_item_type=param_item_ind.map(|param_ind|self.params.get(param_ind).unwrap().0);
+        //
+        let (pattern_len,pattern_many)=self.inner_param_pattern(param_item_ind);
 
-        //calc len of any repeating patterns in the param group eg (int bool int bool) => (int bool) => 2
-        //bit inefficent to recalc patterns everytime a param is added, should instead do it once they are all added
-
-        //need to break pattern if there is a param_optional? or have no pattern at all?
-
-        let (pattern_len,patterns_num)={ //pattern_len aka pattern_ssstuple_len
-            let last_group = self.nodes.last().unwrap().param_groups.last().unwrap();
-
-            if last_group.param_optional.is_some() { //if theres a optional param, don't use patterns
-                //should set patterns_num to 0? so in parser is skipped over?
-                //  check in parser if pattern_num is 0 instead of params_optional.is_none()?
-                (last_group.params.len()+1,1)
-            } else {
-                let mut param_types=last_group
-                    // .params.iter().map(|x|x.map(|x|x.0))
-                    // .params.iter().map(|x|x.as_ref().map(|x|x.0))
-                    .params.iter().map(|&x|x.map(|param_ind|self.params.get(param_ind).unwrap().0))
-
-                    .collect::<Vec<_>>();
-
-                // param_types.push(param_item.as_ref().map(|x|x.0));
-                param_types.push(param_item_type);
-
-                //
-                let mut ok=false;
-                let mut pattern = vec![param_types.get(0).cloned().unwrap()];
-
-                for param_ind in 1 .. param_types.len() {
-                    ok=true;
-
-                    if param_types.len()%pattern.len() !=0 {
-                        pattern.push(param_types.get(param_ind).cloned().unwrap());
-                        continue;
-                    }
-
-                    for x in 1 .. param_types.len()/pattern.len() {
-                        let y=x*pattern.len();
-                        let against_range=y..y+pattern.len();
-                        let against=param_types.get(against_range).unwrap();
-
-                        if !pattern.eq(against) {
-                            ok=false;
-                            break;
-                        }
-                    }
-
-                    if ok {
-                        break;
-                    }
-
-                    pattern.push(param_types.get(param_ind).cloned().unwrap());
-                }
-
-                if ok {
-                    (pattern.len(),param_types.len()/pattern.len())
-                } else {
-                    (param_types.len(),1)
-                }
-            }
-
-        };
 
         //add param to nodes
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             let param_group=node.param_groups.last_mut().unwrap();
 
+            // println!("ggg {} {:?}",self.is_group_similar,param_group.similar);
             // param_group.params.push(param_item);
             param_group.params.push(param_item_ind);
             param_group.pattern_len=pattern_len;
-            param_group.patterns_num=patterns_num;
+            param_group.pattern_many=pattern_many;
         }
     }
 

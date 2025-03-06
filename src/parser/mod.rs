@@ -372,6 +372,7 @@ pub fn parse_start<'a>(
 
                         //handle adjacent param groups that share a pattern
                         //  do not use patterns when using param_optional
+                        // println!("gs {:?}",param_group.similar());
                         if param_group.similar()!=GroupSimilar::None && param_group.param_optional().is_none() && (param_group.optional() || param_group.repeat()) {
                             let mut has_repeat=param_group.repeat();
                             let mut param_group_ind2=param_group_ind+1;

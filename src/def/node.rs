@@ -9,7 +9,7 @@ use std::any::Any;
 // pub type Param=Option<(std::any::TypeId,&'static str,ParamParse)>;
 pub type Param=(std::any::TypeId,&'static str,ParamParse);
 
-#[derive (Copy,Clone,Default,PartialEq,Eq)]
+#[derive (Copy,Clone,Default,PartialEq,Eq,Debug)]
 pub enum GroupSimilar {
     #[default]
     None,
@@ -28,7 +28,7 @@ pub struct ParamGroup {
     // pub params : Vec<Param>,
     pub params : Vec<Option<usize>>,
     pub pattern_len:usize,
-    pub patterns_num:usize,
+    pub pattern_many:usize,
 
     // pub specified:bool, //actually added via .group()
     pub similar:GroupSimilar,
