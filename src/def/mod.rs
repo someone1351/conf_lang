@@ -285,8 +285,8 @@ impl Def {
 
     pub fn group(mut self,
         name:Option<&str>,
-        optional:bool,
-        repeat:bool,
+        // optional:bool,
+        // repeat:bool,
     ) -> Self {
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
@@ -305,14 +305,46 @@ impl Def {
 
             let last_param_group=node.param_groups.last_mut().unwrap();
 
-            last_param_group.repeat=repeat;
-            last_param_group.optional=optional;
+            // last_param_group.repeat=repeat;
+            // last_param_group.optional=optional;
             last_param_group.name=name.map(|x|x.to_string());
         }
 
         self
     }
 
+    pub fn group_repeat(mut self) -> Self {
+        //add node if there are none set
+        if self.cur_nodes_start==self.nodes.len() {
+            self.inner_entry();
+        }
+
+        //
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+            let last_group=node.param_groups.last_mut().unwrap();
+            last_group.specified =true;
+            last_group.repeat=true;
+        }
+
+        self
+    }
+    pub fn group_optional(mut self) -> Self {
+        //add node if there are none set
+        if self.cur_nodes_start==self.nodes.len() {
+            self.inner_entry();
+        }
+
+        //
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+            let last_group=node.param_groups.last_mut().unwrap();
+            last_group.specified =true;
+            last_group.optional=true;
+        }
+
+        self
+    }
     fn inner_add_param_item(&mut self,param_item:Option<Param>) {
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
@@ -433,7 +465,7 @@ impl Def {
         self
     }
 
-    pub fn optional(mut self) -> Self {
+    pub fn param_optional(mut self) -> Self {
         //add node if there are none set
         if self.cur_nodes_start==self.nodes.len() {
             self.inner_entry();
