@@ -111,9 +111,9 @@ impl<'a> ParamGroupContainer<'a> {
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
         param_group.patterns_num
     }
-    pub fn specified(&self) -> bool {
-        let node=self.def.nodes.get(self.node_ind).unwrap();
-        let param_group=node.param_groups.get(self.param_group_ind).unwrap();
-        param_group.specified
-    }
+    // pub fn specified(&self) -> bool {
+    //     let node=self.def.nodes.get(self.node_ind).unwrap();
+    //     let param_group=node.param_groups.get(self.param_group_ind).unwrap();
+    //     // param_group.specified
+    // }
 }

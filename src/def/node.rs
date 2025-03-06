@@ -22,7 +22,7 @@ pub struct ParamGroup {
     pub pattern_len:usize,
     pub patterns_num:usize,
 
-    pub specified:bool, //actually added via .group()
+    // pub specified:bool, //actually added via .group()
 }
 
 #[derive (Clone,PartialEq,Eq,Default)]

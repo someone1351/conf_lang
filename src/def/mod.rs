@@ -28,6 +28,7 @@ impl Def {
     pub fn new() -> Self {
         Self {
             branches : Vec::new(),
+            // branches:vec![Branch{ tags: todo!(), non_tags: todo!(), branch_inserts: todo!(), branch_name: todo!() }]
             branch_map : HashMap::new(),
             nodes : Vec::new(),
             params : Vec::new(),
@@ -79,14 +80,18 @@ impl Def {
         self
     }
 
+    fn init_branch(&mut self) {
+        if self.branches.is_empty() {
+            self.branches.push(Default::default());
+        }
+    }
+
     pub fn include<'a,B>(mut self, branch_names : B) -> Self
     where
         B :IntoIterator<Item = &'a str>
     { //from branch_nodes_from
         //
-        if self.branches.is_empty() {
-            self.branches.push(Default::default());
-        }
+        self.init_branch();
 
         //
         // let cur_branch = self.branches.last_mut().unwrap();
@@ -104,16 +109,17 @@ impl Def {
         self
     }
 
-    pub fn tagless_nodes(mut self, ) -> Self {
-        //
-        if self.branches.is_empty() {
-            self.branches.push(Default::default());
-        }
+    fn inner_tagless_nodes(&mut self) {
+        self.init_branch();
 
-        //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
         self.for_tag_names.clear();
         self.tags_once=false;
+    }
+
+    pub fn tagless_nodes(mut self, ) -> Self {
+        //
+        self.inner_tagless_nodes();
 
         //
         self
@@ -124,9 +130,7 @@ impl Def {
         T:IntoIterator<Item = &'t str>,
     {
         //
-        if self.branches.is_empty() {
-            self.branches.push(Default::default());
-        }
+        self.init_branch();
 
         //
         self.cur_nodes_start = self.nodes.len(); //makes modifying a node an error if each hasnt been called?
@@ -152,72 +156,87 @@ impl Def {
         self
     }
 
+    fn inner_entry_tagless(&mut self) {
+        self.init_branch();
+        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
+        self.cur_nodes_start = self.nodes.len();
+
+        let node_index = self.nodes.len();
+        cur_branch.non_tags.push(node_index);
+
+        self.nodes.push(Node{
+            branch_ind:self.cur_branch_ind,
+            has_tag:false,
+            tag_once:self.tags_once,
+            // param_groups:vec![ParamGroup::default()],
+            param_groups:Vec::new(),
+            .. Default::default()
+        });
+    }
+
+    fn inner_entry_tags(&mut self) {
+        self.init_branch();
+        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
+        self.cur_nodes_start = self.nodes.len();
+
+        for tag_name in self.for_tag_names.iter() {
+            let node_index = self.nodes.len();
+            cur_branch.tags.entry(tag_name.clone()).or_default().push(node_index);
+
+            self.nodes.push(Node{
+                branch_ind:self.cur_branch_ind,
+                has_tag:true,
+                tag_once:self.tags_once,
+                // param_groups:vec![ParamGroup::default()],
+                param_groups:Vec::new(),
+                .. Default::default()
+            });
+        }
+    }
     fn inner_entry(&mut self) {
         //adds a bunch of nodes for each tagname or if tagless a single node
 
         //
-        if self.branches.is_empty() {
-            self.branches.push(Default::default());
-        }
+        // self.init_branch();
 
         //
-        // let branch_ind=self.branches.len()-1;
-        // let cur_branch = self.branches.last_mut().unwrap();
-        let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
+        // // let branch_ind=self.branches.len()-1;
+        // // let cur_branch = self.branches.last_mut().unwrap();
+        // let cur_branch = self.branches.get_mut(self.cur_branch_ind).unwrap();
 
         //
-        self.cur_nodes_start = self.nodes.len();
+        // self.cur_nodes_start = self.nodes.len();
 
         //
         if self.for_tag_names.len()==0 {
-            let node_index = self.nodes.len();
-            cur_branch.non_tags.push(node_index);
-
-            self.nodes.push(Node{
-                branch_ind:self.cur_branch_ind,
-                has_tag:false,
-                tag_once:self.tags_once,
-                param_groups:vec![ParamGroup::default()],
-                .. Default::default()
-            });
+            self.inner_entry_tagless();
         } else {
-            for tag_name in self.for_tag_names.iter() {
-                let node_index = self.nodes.len();
-                cur_branch.tags.entry(tag_name.clone()).or_default().push(node_index);
-
-                self.nodes.push(Node{
-                    branch_ind:self.cur_branch_ind,
-                    has_tag:true,
-                    tag_once:self.tags_once,
-                    param_groups:vec![ParamGroup::default()],
-                    .. Default::default()
-                });
-            }
+            self.inner_entry_tags();
         }
     }
 
     pub fn entry(mut self,
-        label : Option<&str>,
+        // label : Option<&str>,
     ) -> Self {
         self.inner_entry();
 
-        for node_index in self.cur_nodes_start .. self.nodes.len() {
-            let node=self.nodes.get_mut(node_index).unwrap();
-            node.node_label=label.map(|x|x.to_string());
-        }
+        // for node_index in self.cur_nodes_start .. self.nodes.len() {
+        //     let node=self.nodes.get_mut(node_index).unwrap();
+        //     node.node_label=label.map(|x|x.to_string());
+        // }
 
         self
     }
 
     pub fn entry_children(mut self,
-        label : Option<&str>,
+        // label : Option<&str>,
         children : &str, //would like to make this an array of branches that can be used as children, but no idea on how to modify code in the parser to handle that
     ) -> Self {
         self.inner_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-            node.node_label=label.map(|x|x.to_string());
+            // node.node_label=label.map(|x|x.to_string());
 
             node.children = NodeChildren::Branch(children.to_string());
         }
@@ -225,13 +244,13 @@ impl Def {
         self
     }
     pub fn entry_text(mut self,
-        label : Option<&str>,
+        // label : Option<&str>,
     ) -> Self {
         self.inner_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-            node.node_label=label.map(|x|x.to_string());
+            // node.node_label=label.map(|x|x.to_string());
             node.children = NodeChildren::Body(None);
         }
 
@@ -239,21 +258,21 @@ impl Def {
     }
 
     pub fn rentry(mut self,
-        label : Option<&str>,
+        // label : Option<&str>,
     ) -> Self {
         self.inner_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
-            node.node_label=label.map(|x|x.to_string());
+            // node.node_label=label.map(|x|x.to_string());
         }
 
         self
     }
 
     pub fn rentry_children(mut self,
-        label : Option<&str>,
+        // label : Option<&str>,
         children : &str,
     ) -> Self {
         self.inner_entry();
@@ -261,7 +280,7 @@ impl Def {
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
-            node.node_label=label.map(|x|x.to_string());
+            // node.node_label=label.map(|x|x.to_string());
             node.children = NodeChildren::Branch(children.to_string());
         }
 
@@ -269,61 +288,112 @@ impl Def {
     }
 
     pub fn rentry_text(mut self,
-        label : Option<&str>,
+        // label : Option<&str>,
     ) -> Self {
         self.inner_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             node.rsimilar=true;
-            node.node_label=label.map(|x|x.to_string());
+            // node.node_label=label.map(|x|x.to_string());
             node.children = NodeChildren::Body(None);
         }
 
         self
     }
 
-    pub fn group(mut self,
-        name:Option<&str>,
-        // optional:bool,
-        // repeat:bool,
-    ) -> Self {
-        //add node if there are none set
-        if self.cur_nodes_start==self.nodes.len() {
-            self.inner_entry();
-        }
+    fn init_entry(&mut self) {
+        self.init_branch();
 
-        //
+        if self.cur_nodes_start==self.nodes.len() {
+            self.inner_entry_tagless();
+        }
+    }
+
+    pub fn entry_label(mut self,label : &str) -> Self {
+        self.init_entry();
+
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-
-            if !node.param_groups.last().unwrap().specified {
-                node.param_groups.pop().unwrap();
-            }
-
-            node.param_groups.push(ParamGroup{specified:true,..Default::default()});
-
-            let last_param_group=node.param_groups.last_mut().unwrap();
-
-            // last_param_group.repeat=repeat;
-            // last_param_group.optional=optional;
-            last_param_group.name=name.map(|x|x.to_string());
+            node.node_label=Some(label.to_string());
         }
 
         self
     }
 
-    pub fn group_repeat(mut self) -> Self {
+    pub fn group(mut self,
+        // name:Option<&str>,
+        // optional:bool,
+        // repeat:bool,
+    ) -> Self {
         //add node if there are none set
-        if self.cur_nodes_start==self.nodes.len() {
-            self.inner_entry();
+        // if self.cur_nodes_start==self.nodes.len() {
+        //     self.inner_entry();
+        // }
+        self.init_entry();
+
+        //
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+
+            // if !node.param_groups.last().unwrap().specified {
+            //     node.param_groups.pop().unwrap();
+            // }
+
+            // node.param_groups.push(ParamGroup{specified:true,..Default::default()});
+            node.param_groups.push(ParamGroup::default());
+
+            // let last_param_group=node.param_groups.last_mut().unwrap();
+
+            // // last_param_group.repeat=repeat;
+            // // last_param_group.optional=optional;
+            // last_param_group.name=name.map(|x|x.to_string());
         }
+
+        self
+    }
+
+    fn init_group(&mut self) {
+        self.init_entry();
+
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+
+            if node.param_groups.is_empty() {
+                node.param_groups.push(ParamGroup::default());
+            }
+        }
+    }
+
+    pub fn group_label(mut self,name:&str) -> Self {
+        //add node if there are none set
+        // if self.cur_nodes_start==self.nodes.len() {
+        //     self.inner_entry();
+        // }
+        self.init_group();
 
         //
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             let last_group=node.param_groups.last_mut().unwrap();
-            last_group.specified =true;
+            // last_group.specified =true;
+            last_group.name=Some(name.to_string());
+        }
+
+        self
+    }
+    pub fn group_repeat(mut self) -> Self {
+        //add node if there are none set
+        // if self.cur_nodes_start==self.nodes.len() {
+        //     self.inner_entry();
+        // }
+        self.init_group();
+
+        //
+        for node_index in self.cur_nodes_start .. self.nodes.len() {
+            let node=self.nodes.get_mut(node_index).unwrap();
+            let last_group=node.param_groups.last_mut().unwrap();
+            // last_group.specified =true;
             last_group.repeat=true;
         }
 
@@ -331,25 +401,28 @@ impl Def {
     }
     pub fn group_optional(mut self) -> Self {
         //add node if there are none set
-        if self.cur_nodes_start==self.nodes.len() {
-            self.inner_entry();
-        }
+        // if self.cur_nodes_start==self.nodes.len() {
+        //     self.inner_entry();
+        // }
+        self.init_group();
 
         //
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
             let last_group=node.param_groups.last_mut().unwrap();
-            last_group.specified =true;
+            // last_group.specified =true;
             last_group.optional=true;
         }
 
         self
     }
+
     fn inner_add_param_item(&mut self,param_item:Option<Param>) {
         //add node if there are none set
-        if self.cur_nodes_start==self.nodes.len() {
-            self.inner_entry();
-        }
+        // if self.cur_nodes_start==self.nodes.len() {
+        //     self.inner_entry();
+        // }
+        self.init_group();
 
         //
         //any is param_item==None, so here it doesn't get added to def.params?
@@ -467,9 +540,10 @@ impl Def {
 
     pub fn param_optional(mut self) -> Self {
         //add node if there are none set
-        if self.cur_nodes_start==self.nodes.len() {
-            self.inner_entry();
-        }
+        // if self.cur_nodes_start==self.nodes.len() {
+        //     self.inner_entry();
+        // }
+        self.init_group();
 
         //
         for node_index in self.cur_nodes_start .. self.nodes.len() {
