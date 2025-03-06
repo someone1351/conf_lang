@@ -215,42 +215,27 @@ impl Def {
         }
     }
 
-    pub fn entry(mut self,
-        // label : Option<&str>,
-    ) -> Self {
+    pub fn entry(mut self) -> Self { //entry
         self.inner_entry();
-
-        // for node_index in self.cur_nodes_start .. self.nodes.len() {
-        //     let node=self.nodes.get_mut(node_index).unwrap();
-        //     node.node_label=label.map(|x|x.to_string());
-        // }
-
         self
     }
 
-    pub fn entry_children(mut self,
-        // label : Option<&str>,
-        children : &str, //would like to make this an array of branches that can be used as children, but no idea on how to modify code in the parser to handle that
-    ) -> Self {
+    //would like to make this an array of branches that can be used as children, but no idea on how to modify code in the parser to handle that
+    pub fn entry_children(mut self,children : &str) -> Self { //centry
         self.inner_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-            // node.node_label=label.map(|x|x.to_string());
-
             node.children = NodeChildren::Branch(children.to_string());
         }
 
         self
     }
-    pub fn entry_text(mut self,
-        // label : Option<&str>,
-    ) -> Self {
+    pub fn entry_text(mut self) -> Self { //tentry
         self.inner_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-            // node.node_label=label.map(|x|x.to_string());
             node.children = NodeChildren::Body(None);
         }
 
