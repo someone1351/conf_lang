@@ -1,6 +1,8 @@
 
 use std::any::{Any, TypeId};
 
+use crate::def::GroupSimilar;
+
 use super::super::Def;
 
 
@@ -116,4 +118,10 @@ impl<'a> ParamGroupContainer<'a> {
     //     let param_group=node.param_groups.get(self.param_group_ind).unwrap();
     //     // param_group.specified
     // }
+
+    pub fn similar(&self) -> GroupSimilar {
+        let node=self.def.nodes.get(self.node_ind).unwrap();
+        let param_group=node.param_groups.get(self.param_group_ind).unwrap();
+        param_group.similar
+    }
 }

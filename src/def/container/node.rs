@@ -1,6 +1,7 @@
 // use std::any::{Any, TypeId};
 // use std::ops::{Bound, Range};
 
+
 use super::branch::BranchContainer;
 // use super::super::grammar::Grammar;
 use super::super::Def;
@@ -25,15 +26,15 @@ impl<'a> NodeContainer<'a> {
             NodeChildren::Body(body_node_label) => NodeChildrenContainer::Body(body_node_label.as_ref().map(|x|x.as_str())),
             NodeChildren::Branch(branch_name) => {
                 self.def.branch_map.get(branch_name.as_str())
-                    .map(|&children_branch_ind|BranchContainer { 
-                        def: self.def, 
-                        branch_ind: children_branch_ind, 
+                    .map(|&children_branch_ind|BranchContainer {
+                        def: self.def,
+                        branch_ind: children_branch_ind,
                     }).map(|branch|NodeChildrenContainer::Branch(branch))
                     .unwrap_or(NodeChildrenContainer::BranchMissing(branch_name.as_str()))
             },
         }
     }
-    
+
     pub fn branch_ind(&self) -> usize {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         node.branch_ind
@@ -58,11 +59,11 @@ impl<'a> NodeContainer<'a> {
 
     // pub fn params_repeat(&self) -> Option<Range<usize>> {
     //     let node=self.grammar.nodes.get(self.node_ind).unwrap();
-        
+
     //     let Some((start,end))=node.params_repeat else {
     //         return None;
     //     };
-        
+
     //     let start=match start {
     //         Bound::Unbounded => 0,
     //         Bound::Included(x) => x,
@@ -74,7 +75,7 @@ impl<'a> NodeContainer<'a> {
     //         Bound::Included(x) => x+1,
     //         Bound::Excluded(x) => x,
     //     };
-        
+
     //     Some(start..end)
     // }
 
@@ -82,7 +83,7 @@ impl<'a> NodeContainer<'a> {
     //     let node=self.grammar.nodes.get(self.node_ind).unwrap();
     //     node.params_optional
     // }
-    
+
     pub fn has_tag(&self) -> bool {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         node.has_tag
@@ -130,8 +131,9 @@ impl<'a> NodeContainer<'a> {
     //     let node=self.grammar.nodes.get(self.node_ind).unwrap();
     //     node.params.get(i).and_then(|x|*x).map(|x|x.1)
     // }
-    pub fn rsimilar(&self) -> bool {
-        let node=self.def.nodes.get(self.node_ind).unwrap();
-        node.rsimilar
-    }
+    // pub fn rsimilar(&self) -> bool {
+    //     let node=self.def.nodes.get(self.node_ind).unwrap();
+    //     node.rsimilar
+    // }
+
 }

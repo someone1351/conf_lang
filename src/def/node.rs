@@ -1,5 +1,6 @@
 use std::any::Any;
 
+
 // pub enum NodeParamType {
 //     Param
 //     Group
@@ -8,6 +9,13 @@ use std::any::Any;
 // pub type Param=Option<(std::any::TypeId,&'static str,ParamParse)>;
 pub type Param=(std::any::TypeId,&'static str,ParamParse);
 
+#[derive (Copy,Clone,Default,PartialEq,Eq)]
+pub enum GroupSimilar {
+    #[default]
+    None,
+    Left,
+    Right,
+}
 
 #[derive (Default)]
 pub struct ParamGroup {
@@ -23,6 +31,7 @@ pub struct ParamGroup {
     pub patterns_num:usize,
 
     // pub specified:bool, //actually added via .group()
+    pub similar:GroupSimilar,
 }
 
 #[derive (Clone,PartialEq,Eq,Default)]
@@ -56,7 +65,7 @@ pub struct Node {
     // pub params
     // pub tag_valstr_key:usize,
     // ignore_children : bool,
-    pub rsimilar:bool,
+    // pub rsimilar:bool,
 }
 
 // impl<> Node {

@@ -117,7 +117,7 @@ impl Def {
         self.tags_once=false;
     }
 
-    pub fn tagless_nodes(mut self, ) -> Self {
+    pub fn tagless(mut self, ) -> Self {
         //
         self.inner_tagless_nodes();
 
@@ -140,7 +140,7 @@ impl Def {
 
     }
 
-    pub fn tag_nodes<'t,T>(mut self, tag_names: T) -> Self
+    pub fn tags<'t,T>(mut self, tag_names: T) -> Self
     where
         T:IntoIterator<Item = &'t str>,
     {
@@ -257,51 +257,6 @@ impl Def {
         self
     }
 
-    pub fn rentry(mut self,
-        // label : Option<&str>,
-    ) -> Self {
-        self.inner_entry();
-
-        for node_index in self.cur_nodes_start .. self.nodes.len() {
-            let node=self.nodes.get_mut(node_index).unwrap();
-            node.rsimilar=true;
-            // node.node_label=label.map(|x|x.to_string());
-        }
-
-        self
-    }
-
-    pub fn rentry_children(mut self,
-        // label : Option<&str>,
-        children : &str,
-    ) -> Self {
-        self.inner_entry();
-
-        for node_index in self.cur_nodes_start .. self.nodes.len() {
-            let node=self.nodes.get_mut(node_index).unwrap();
-            node.rsimilar=true;
-            // node.node_label=label.map(|x|x.to_string());
-            node.children = NodeChildren::Branch(children.to_string());
-        }
-
-        self
-    }
-
-    pub fn rentry_text(mut self,
-        // label : Option<&str>,
-    ) -> Self {
-        self.inner_entry();
-
-        for node_index in self.cur_nodes_start .. self.nodes.len() {
-            let node=self.nodes.get_mut(node_index).unwrap();
-            node.rsimilar=true;
-            // node.node_label=label.map(|x|x.to_string());
-            node.children = NodeChildren::Body(None);
-        }
-
-        self
-    }
-
     fn init_entry(&mut self) {
         self.init_branch();
 
@@ -321,35 +276,27 @@ impl Def {
         self
     }
 
-    pub fn group(mut self,
-        // name:Option<&str>,
-        // optional:bool,
-        // repeat:bool,
-    ) -> Self {
-        //add node if there are none set
-        // if self.cur_nodes_start==self.nodes.len() {
-        //     self.inner_entry();
-        // }
+    fn inner_group(&mut self, pattern_type:GroupSimilar) {
         self.init_entry();
 
-        //
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
-
-            // if !node.param_groups.last().unwrap().specified {
-            //     node.param_groups.pop().unwrap();
-            // }
-
-            // node.param_groups.push(ParamGroup{specified:true,..Default::default()});
-            node.param_groups.push(ParamGroup::default());
-
-            // let last_param_group=node.param_groups.last_mut().unwrap();
-
-            // // last_param_group.repeat=repeat;
-            // // last_param_group.optional=optional;
-            // last_param_group.name=name.map(|x|x.to_string());
+            node.param_groups.push(ParamGroup{similar: pattern_type,..Default::default()});
         }
+    }
 
+    pub fn group(mut self) -> Self {
+        self.inner_group(GroupSimilar::None);
+        self
+    }
+
+    pub fn lgroup(mut self) -> Self {
+        self.inner_group(GroupSimilar::Left);
+        self
+    }
+
+    pub fn rgroup(mut self) -> Self {
+        self.inner_group(GroupSimilar::Right);
         self
     }
 
@@ -360,7 +307,7 @@ impl Def {
             let node=self.nodes.get_mut(node_index).unwrap();
 
             if node.param_groups.is_empty() {
-                node.param_groups.push(ParamGroup::default());
+                node.param_groups.push(ParamGroup{similar:GroupSimilar::None,..Default::default()});
             }
         }
     }

@@ -85,6 +85,8 @@ use error::{ParseError, ParseErrorType};
 
 
 
+use crate::def::node::GroupSimilar;
+
 use super::conf::{self,Record,Value};
 use super::def::container::branch::BranchContainer;
 use super::def::container::node_children::NodeChildrenContainer;
@@ -370,7 +372,7 @@ pub fn parse_start<'a>(
 
                         //handle adjacent param groups that share a pattern
                         //  do not use patterns when using param_optional
-                        if param_group.param_optional().is_none() && (param_group.optional() || param_group.repeat()) {
+                        if param_group.similar()!=GroupSimilar::None && param_group.param_optional().is_none() && (param_group.optional() || param_group.repeat()) {
                             let mut has_repeat=param_group.repeat();
                             let mut param_group_ind2=param_group_ind+1;
 
@@ -383,7 +385,7 @@ pub fn parse_start<'a>(
                                 let param_group2=node.param_group(param_group_ind2).unwrap();
 
                                 //do not use patterns when using param_optional
-                                if param_group2.param_optional().is_some() {
+                                if param_group.similar()!=param_group2.similar() || param_group2.param_optional().is_some() {
                                     break;
                                 }
 
@@ -483,7 +485,8 @@ pub fn parse_start<'a>(
                                 ) {
                                     //println!("-------tryyyy");
 
-                                    let from_right=node.rsimilar();
+                                    // let from_right=node.rsimilar();
+                                    let from_right = param_group.similar()==GroupSimilar::Right;
 
                                     //int? int? int int*
                                     //int* int? int? int
