@@ -127,7 +127,9 @@ impl Def {
         self
     }
 
-    fn inner_tag_nodes<'t,T>(&mut self, tag_names: T, once:bool)
+    fn inner_tag_nodes<'t,T>(&mut self, tag_names: T,
+        once:bool
+    )
     where
         T:IntoIterator<Item = &'t str>,
     {
@@ -146,7 +148,7 @@ impl Def {
     where
         T:IntoIterator<Item = &'t str>,
     {
-        self.inner_tag_nodes(tag_names,false);
+        self.inner_tag_nodes(tag_names, false );
         self
     }
 
@@ -157,6 +159,11 @@ impl Def {
         self.inner_tag_nodes(tag_names,true);
         self
     }
+
+    // pub fn tags_once(mut self) -> Self {
+    //     self.tags_once=true;
+    //     self
+    // }
 
     fn inner_entry_tagless(&mut self) {
         self.init_branch();
@@ -225,6 +232,7 @@ impl Def {
     //would like to make this an array of branches that can be used as children, but no idea on how to modify code in the parser to handle that
     pub fn entry_children(mut self,children : &str) -> Self { //centry
         self.inner_entry();
+        // self.init_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
@@ -235,6 +243,7 @@ impl Def {
     }
     pub fn entry_text(mut self) -> Self { //tentry
         self.inner_entry();
+        // self.init_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
             let node=self.nodes.get_mut(node_index).unwrap();
@@ -252,7 +261,7 @@ impl Def {
         }
     }
 
-    pub fn label_entry(mut self,label : &str) -> Self {
+    pub fn elabel(mut self,label : &str) -> Self {
         self.init_entry();
 
         for node_index in self.cur_nodes_start .. self.nodes.len() {
@@ -279,12 +288,12 @@ impl Def {
         self
     }
 
-    pub fn lgroup(mut self) -> Self {
+    pub fn group_left(mut self) -> Self {
         self.inner_group(GroupSimilar::Left);
         self
     }
 
-    pub fn rgroup(mut self) -> Self {
+    pub fn group_right(mut self) -> Self {
         self.inner_group(GroupSimilar::Right);
         self
     }
@@ -305,7 +314,7 @@ impl Def {
         }
     }
 
-    pub fn label_group(mut self,name:&str) -> Self {
+    pub fn glabel(mut self,name:&str) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
@@ -322,7 +331,7 @@ impl Def {
 
         self
     }
-    pub fn repeat_group(mut self) -> Self {
+    pub fn grepeat(mut self) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
@@ -339,7 +348,7 @@ impl Def {
 
         self
     }
-    pub fn optional_group(mut self) -> Self {
+    pub fn goptional(mut self) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
