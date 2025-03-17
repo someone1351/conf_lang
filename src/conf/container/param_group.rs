@@ -29,7 +29,7 @@ impl<'a> ParamGroupContainer<'a> {
     // pub fn repeats_num(&self) -> usize {
     //     (self.values_num()/self.params_num())-1
     // }
-    
+
     pub fn many_num(&self) -> usize {
         if self.conf.is_none(){return 0;}
         self.values_num()/self.params_num()
@@ -43,7 +43,7 @@ impl<'a> ParamGroupContainer<'a> {
     //     } else {
     //         (0,0)
     //     };
-        
+
     //     ValueIter {
     //         value_start,
     //         value_end,
@@ -91,12 +91,12 @@ impl<'a> ParamGroupContainer<'a> {
             conf_value_ind: self.param_group().conf_values.start+ind,
         })
     }
-    
+
     pub fn values_num(&self) -> usize {
         if self.conf.is_none(){return 0;}
         self.param_group().conf_values.len()
     }
-    
+
     pub fn values(&self) -> ValueIter<'a> {
         if self.conf.is_none() {return Default::default();};
 
@@ -106,8 +106,10 @@ impl<'a> ParamGroupContainer<'a> {
             conf:self.conf,
         }
     }
-    pub fn get_values<R:RangeBounds<usize>>(&self,r:R) -> Option<ValueIter<'a>> {
-        if self.conf.is_none() {return None;}
+    pub fn get_values<R:RangeBounds<usize>>(&self,r:R) -> ValueIter<'a> {
+        if self.conf.is_none() {
+            return ValueIter::default();
+        }
 
         let range_start=match r.start_bound() {
             Bound::Included(x)=>*x,
@@ -121,20 +123,24 @@ impl<'a> ParamGroupContainer<'a> {
             Bound:: Unbounded=>self.values_num(),
         };
 
-        if range_start>range_end {return None;} //if range start==end will return some empty iter
+        if range_start>range_end {
+            return ValueIter::default();
+        } //if range start==end will return some empty iter
 
         let x_len=range_end-range_start;
 
-        if x_len>self.values_num() {return None;}
+        if x_len>self.values_num() {
+            return ValueIter::default();
+        }
 
         let x_start=self.param_group().conf_values.start+range_start;
         let x_end = x_start+x_len;
 
-        Some(ValueIter {
+        ValueIter {
             conf_value_start:x_start,
             conf_value_end:x_end,
             conf:self.conf,
-        })
+        }
     }
     pub fn get_parsed_array<T:Copy+'static, const COUNT: usize>(&self,init:T) -> Option<[T;COUNT]> {
         let mut array=[init;COUNT];
@@ -144,13 +150,13 @@ impl<'a> ParamGroupContainer<'a> {
                 if let Some(parsed)=value.get_parsed::<T>() {
                     array[i]=parsed;
                 } else { //if parsed fails, then return nothing
-                    return None; 
+                    return None;
                 }
             } else { //if not enough values, return what was already gotten, and the rest uses the init
                 break;
             }
         }
-        
+
         Some(array)
     }
 
@@ -175,7 +181,7 @@ impl<'a> ParamGroupContainer<'a> {
     // pub fn parsed<T:Any+Copy>(&self, param_group_value_ind : usize) -> Option<T> {
     //     self.value(param_group_value_ind).and_then(|x|x.parsed())
     // }
-    
+
     // pub fn str(&self, param_group_value_ind : usize) -> Option<&'a str> {
     //     self.value(param_group_value_ind).map(|x|x.str())
     // }
@@ -185,7 +191,7 @@ impl<'a> ParamGroupContainer<'a> {
         let text=text_ind.map(|text_ind|self.conf.unwrap().texts.get(text_ind).unwrap().as_str());
         text
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.conf.is_none()
     }
