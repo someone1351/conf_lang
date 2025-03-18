@@ -348,7 +348,7 @@ impl Def {
 
         self
     }
-    pub fn goptional(mut self) -> Self {
+    pub fn goptional(mut self, from:Option<usize>) -> Self {
         //add node if there are none set
         // if self.cur_nodes_start==self.nodes.len() {
         //     self.inner_entry();
@@ -360,7 +360,14 @@ impl Def {
             let node=self.nodes.get_mut(node_index).unwrap();
             let last_group=node.param_groups.last_mut().unwrap();
             // last_group.specified =true;
-            last_group.optional=true;
+
+            if let Some(from)=from {
+                last_group.param_optional = Some(from);
+            } else {
+                last_group.optional=true;
+            }
+
+
         }
 
         self
@@ -502,23 +509,23 @@ impl Def {
         self
     }
 
-    pub fn param_optional(mut self) -> Self {
-        //add node if there are none set
-        // if self.cur_nodes_start==self.nodes.len() {
-        //     self.inner_entry();
-        // }
-        self.init_group();
+    // pub fn param_optional(mut self) -> Self {
+    //     //add node if there are none set
+    //     // if self.cur_nodes_start==self.nodes.len() {
+    //     //     self.inner_entry();
+    //     // }
+    //     self.init_group();
 
-        //
-        for node_index in self.cur_nodes_start .. self.nodes.len() {
-            let node=self.nodes.get_mut(node_index).unwrap();
-            let param_group=node.param_groups.last_mut().unwrap();
+    //     //
+    //     for node_index in self.cur_nodes_start .. self.nodes.len() {
+    //         let node=self.nodes.get_mut(node_index).unwrap();
+    //         let param_group=node.param_groups.last_mut().unwrap();
 
-            if param_group.param_optional.is_none() {
-                param_group.param_optional = Some(param_group.params.len());
-            }
-        }
+    //         if param_group.param_optional.is_none() {
+    //             param_group.param_optional = Some(param_group.params.len());
+    //         }
+    //     }
 
-        self
-    }
+    //     self
+    // }
 }

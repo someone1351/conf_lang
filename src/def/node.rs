@@ -21,7 +21,8 @@ pub enum GroupSimilar {
 pub struct ParamGroup {
     // pub priority:i32,
     pub optional:bool, //group optional
-    pub param_optional : Option<usize>, //
+    pub param_optional : Option<usize>, //todo somehow merge with optional?
+
     pub repeat:bool,
     // pub first:bool,
     pub name:Option<String>,
