@@ -319,7 +319,7 @@ impl<'a> RecordContainer<'a> {
         }
     }
 
-    pub fn get_values<R:RangeBounds<usize>>(&self,r:R) -> ValueIter<'a> {
+    pub fn values_range<R:RangeBounds<usize>>(&self,r:R) -> ValueIter<'a> {
         if self.conf.is_none() {
             return ValueIter::default();
         }
