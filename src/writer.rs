@@ -10,15 +10,8 @@ pub struct Writer {
     param_used:bool,
     // cur_params:Vec<String>,
     last_newline:bool,
-
-
 }
 
-// impl ToString for Writer {
-//     fn to_string(&self) -> String {
-//         self.buffer.clone()
-//     }
-// }
 
 impl std::fmt::Display for Writer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -44,6 +37,10 @@ impl Writer {
     }
 
     pub fn comment<T:ToString>(&mut self,indent:usize,val:T) -> &mut Self {
+        if !self.last_newline {
+            self.buffer.push('\n');
+        }
+
         self.record_indent=0;
         self.param_used=false;
         self.last_newline=true;
@@ -71,6 +68,10 @@ impl Writer {
     }
 
     pub fn newline(&mut self,indent:usize) -> &mut Self {
+        if !self.last_newline {
+            self.buffer.push('\n');
+        }
+
         self.record_indent=0;
         self.param_used=false;
         self.last_newline=true;
@@ -84,6 +85,10 @@ impl Writer {
     }
 
     pub fn text<T:ToString>(&mut self,indent:usize,val:T) -> &mut Self {
+        if !self.last_newline {
+            self.buffer.push('\n');
+        }
+
         self.record_indent=0;
         self.param_used=false;
         self.last_newline=true;
@@ -133,7 +138,6 @@ impl Writer {
             self.buffer.push(' ');
         } else {
             if !self.last_newline {
-                self.last_newline=false;
                 self.buffer.push('\n');
             }
 
@@ -190,6 +194,7 @@ impl Writer {
         //
         self.param_used=true;
         self.record_indent=0;
+        self.last_newline=false;
 
     }
 
@@ -210,13 +215,3 @@ impl Writer {
         self
     }
 }
-
-/*
-param_start(indent)
-param(val)
-text(indent,val)
-comment(indent,val)
-newline(indent,amount)
-
-
-*/
