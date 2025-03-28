@@ -1,3 +1,10 @@
+/*
+todo
+* allow params to expect noquote, single quote, double quote, back quote, any quote, any
+* should have flag to convert escaped chars? eg \n => newline, \t => tab
+** or have a param func that returns a String, do the conversion?
+*/
+
 pub mod container;
 pub mod node;
 pub mod branch;

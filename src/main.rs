@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
 
-use conf_lang::{ Conf, RecordContainer, Walk};
+use conf_lang::{ Conf, RecordContainer, Walk, Writer};
 
 fn walk_test1_def() -> conf_lang::Def {
     conf_lang::Def::new()
@@ -131,10 +131,23 @@ fn walk_test2() {
     }
 }
 
+
+fn write_test() {
+    let mut writer=Writer::new();
+    writer
+        .record(0).param("v").param(3)
+        .record(1).param("a")
+        .text(2, "hello\nworld")
+        ;
+
+
+    println!("{writer}",);
+}
 fn main() {
     walk_test1();
     // println!("===");
     walk_test2();
+    write_test();
 }
 
 fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, (Conf,String)> {

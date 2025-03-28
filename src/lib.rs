@@ -1,4 +1,4 @@
- 
+
 
 
 mod def;
@@ -6,11 +6,14 @@ mod lexer;
 mod conf;
 mod parser;
 mod walk;
+mod writer;
 
 
 use std::path::Path;
 
 // use parser::parse_start;
+
+pub use writer::Writer;
 
 pub use conf::Conf;
 pub use conf::container::record::RecordContainer;
@@ -33,7 +36,7 @@ pub use walk::{Walk,error::WalkError};
 
 // fn parse<'a>(
 //     walk_branch:BranchContainer,
-//     src : &'a str, 
+//     src : &'a str,
 //     keep_src:bool,
 //     path:Option<&'a Path>,
 // ) -> Result<Conf,ParseError> {
@@ -64,7 +67,7 @@ fn error_msg<T:std::fmt::Debug>(error_type:T,loc:Loc,src : Option<&str>, path:Op
     if let Some(path)=path {
         write!(output,"in {path:?}, ").unwrap();
     }
-    
+
     write!(output,"at {loc}").unwrap();
 
     if let Some(src)=src {

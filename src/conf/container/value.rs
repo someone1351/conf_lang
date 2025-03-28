@@ -72,7 +72,3 @@ impl<'a> ValueContainer<'a> {
         self.conf.is_none()
     }
 }
-
-//todo implement some kind of write trait/func that writes the values using double quotes 
-//  with any double quote chars escaped 
-//  and any escape chars before a quote also escaped

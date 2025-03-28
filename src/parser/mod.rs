@@ -1174,6 +1174,10 @@ fn parse_qval<'a>(lexer : &mut Lexer,quote:&str,tripple:bool,
     // src:&'a str,
     path:Option<&'a Path>
 ) -> Result<bool,ParseError> {
+    //don't handle quotes differently eg single quote doesn't convert escapes like \n to newline,
+    //  instead let the user decide how to handle it themselves
+    //  should do so in def?
+
     // q_val => quote_start ([\\]([\\]|quote)|not_quote_end)* quote_end
 
     lexer.debug_label_push("q_val");
