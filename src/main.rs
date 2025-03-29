@@ -136,8 +136,13 @@ fn write_test() {
     let mut writer=Writer::new();
     writer
         .record(0).param("v").param(3)
+        .newline(1)
+        .comment(1, "this is a comment")
         .record(1).param("a")
         .text(2, "hello\nworld")
+        .newline(1)
+        .record(1).param("b").param("c")
+        .record(1).param_squote(false, "val's").param_dquote(false, "val's").param_bqquote(true, "a\nb\nc\n").param("d")
         ;
 
 
