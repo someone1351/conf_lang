@@ -203,16 +203,51 @@ impl Writer {
         self.inner_param("", val);
         self
     }
+
+    pub fn params<T:IntoIterator<Item=impl ToString>>(&mut self,vals:T) -> &mut Self {
+        for val in vals.into_iter() {
+            self.param(val);
+        }
+
+        self
+    }
     pub fn param_squote<T:ToString>(&mut self,tripple:bool,val:T) -> &mut Self {
         self.inner_param("'".repeat(if tripple {3}else{1}).as_str(), val);
         self
     }
+
+    pub fn param_squotes<T:IntoIterator<Item=impl ToString>>(&mut self,tripple:bool,vals:T) -> &mut Self {
+        for val in vals.into_iter() {
+            self.param_squote(tripple,val);
+        }
+
+        self
+    }
+
     pub fn param_dquote<T:ToString>(&mut self,tripple:bool,val:T) -> &mut Self {
         self.inner_param("\"".repeat(if tripple {3}else{1}).as_str(), val);
         self
     }
-    pub fn param_bqquote<T:ToString>(&mut self,tripple:bool,val:T) -> &mut Self {
+
+    pub fn param_dquotes<T:IntoIterator<Item=impl ToString>>(&mut self,tripple:bool,vals:T) -> &mut Self {
+        for val in vals.into_iter() {
+            self.param_dquote(tripple,val);
+        }
+
+        self
+    }
+
+    pub fn param_bquote<T:ToString>(&mut self,tripple:bool,val:T) -> &mut Self {
         self.inner_param("`".repeat(if tripple {3}else{1}).as_str(), val);
+        self
+    }
+
+
+    pub fn param_bquotes<T:IntoIterator<Item=impl ToString>>(&mut self,tripple:bool,vals:T) -> &mut Self {
+        for val in vals.into_iter() {
+            self.param_bquote(tripple,val);
+        }
+
         self
     }
 }

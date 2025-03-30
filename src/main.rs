@@ -142,7 +142,7 @@ fn write_test() {
         .text(2, "hello\nworld")
         .newline(1)
         .record(1).param("b").param("c")
-        .record(1).param_squote(false, "val's").param_dquote(false, "val's").param_bqquote(true, "a\nb\nc\n").param("d")
+        .record(1).param_squote(false, "val's").param_dquote(false, "val's").param_bquote(true, "a\nb\nc\n").param("d")
         ;
 
 
