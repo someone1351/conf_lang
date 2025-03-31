@@ -45,7 +45,7 @@ fn walk_test1() {
         return;
     };
 
-    let res=test_conf.0.root().walk_ext::<&str>( |mut walk|{
+    let res=test_conf.root().walk_ext::<&str>( |mut walk|{
 
         walk.do_exit();
         let record=walk.record();
@@ -62,7 +62,7 @@ fn walk_test1() {
 
                 return if let Some(conf_data)=confs.get(&include_path) {
                     walk.set_named_note("from",format!("{}",include_path.to_str().unwrap()));
-                    walk.extend(conf_data.0.root().children(),);
+                    walk.extend(conf_data.root().children(),);
 
                     Ok(())
                 } else {
@@ -85,7 +85,7 @@ fn walk_test1() {
     });
 
     if let Err(e)=res {
-        println!("{}",e.msg(e.path.as_ref().and_then(|p|confs.get(p)).map(|x|x.1.as_str())));
+        println!("{}",e.msg(e.path.as_ref().and_then(|p|confs.get(p)).and_then(|conf|conf.src())));
     }
 }
 
@@ -110,7 +110,7 @@ fn walk_test2() {
     let confs=load_confs(def,"examples/test2");
     let Some(test_conf)=confs.get(&PathBuf::from("examples/test2/test.conf")) else { return; };
 
-    let res=test_conf.0.root().walk( |walk|{
+    let res=test_conf.root().walk( |walk|{
         // println!("{}",get_record_info(&walk));
         let mut all_values: Vec<Vec<&str>> = Vec::new();
 
@@ -127,7 +127,7 @@ fn walk_test2() {
     });
 
     if let Err(e)=res {
-        println!("{}",e.msg(e.path.as_ref().and_then(|p|confs.get(p)).map(|x|x.1.as_str())));
+        println!("{}",e.msg(e.path.as_ref().and_then(|p|confs.get(p)).and_then(|conf|conf.src())));
     }
 }
 
@@ -148,14 +148,55 @@ fn write_test() {
 
     println!("{writer}",);
 }
+
+fn walk_test3() {
+    let def = conf_lang::Def::new()
+        .group()
+            .param_any()
+        .group()
+            .param_optional()
+            .param_any()
+        ;
+
+    let src="
+hello
+    ";
+
+    let conf=match def.get_root_branch().parse(src, true,Some(&PathBuf::from("test3"))) {
+        Ok(conf)=>conf,
+        Err(e)=>{
+            println!("{}",e.msg(Some(src)));
+            return;
+        }
+    };
+
+    let res=conf.root().walk( |walk|{
+        let mut all_values: Vec<Vec<&str>> = Vec::new();
+
+        for group_ind in 0..walk.record().param_groups_num() {
+            let group=walk.record().param_group(group_ind);
+            let group_values=group.values().map(|v|v.str()).collect::<Vec<_>>();
+            all_values.push(group_values);
+        }
+
+        println!("{all_values:?}");
+
+    });
+
+    if let Err(e)=res {
+        println!("{}",e.msg(conf.src()));
+    }
+}
+
 fn main() {
     walk_test1();
     // println!("===");
     walk_test2();
     write_test();
+    walk_test3();
 }
 
-fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, (Conf,String)> {
+fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, Conf> {
     let root_branch=def.get_root_branch(); //.get_branch("root_branch");
 
     let file_paths = Vec::from_iter(std::fs::read_dir(dir).unwrap().filter_map(Result::ok)
@@ -170,7 +211,7 @@ fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, (Con
 
         match root_branch.parse(src.as_str(), true,Some(file_path.as_path())) {
             Ok(conf)=>{
-                confs.insert(file_path, (conf,src));
+                confs.insert(file_path, conf);
             }
             Err(e)=>{
                 println!("{}",e.msg(Some(src.as_str())));
