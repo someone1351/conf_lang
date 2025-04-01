@@ -170,9 +170,7 @@ pub fn parse_start<'a>(
             let tokens=parse_body(lexer,last_indent,path)?;
 
             if !tokens.is_empty() {
-                //
                 let last_record_ind=temp_records.len()-1; //records len will always be > 1
-
                 let val_start=all_values.len();
 
                 all_values.extend(tokens.into_iter().map(|token|{
@@ -275,7 +273,7 @@ pub fn parse_start<'a>(
 
             //
             let mut found_node=None;
-            let mut record_attempted_parse_vals:HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>=HashMap::new(); //[record_val_ind][type_id]=any
+            let mut record_attempted_parse_vals:HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>=HashMap::new(); //[record_val_ind][type_id]=val
             let first_val_text=texts.get(record_vals.first().unwrap().text_ind).unwrap().clone();
 
             let mut cur_param_groups=Vec::<TempParamGroup>::new();
@@ -291,7 +289,7 @@ pub fn parse_start<'a>(
                 //
                 let mut ok=true;
 
-                if node.param_groups_num()==1 { //handle single group, more efficient then using code below in else, which would also work
+                if node.param_groups_num()==1 { //handle single group, more efficient then using code below in else, could disable this and only use code in else
                     //
                     let param_group=node.param_group(0).unwrap();
                     let params_num=param_group.params_num();
@@ -317,7 +315,7 @@ pub fn parse_start<'a>(
                                 let text=texts.get(record_val.text_ind).unwrap();
 
                                 //run param func
-                                let param_result=param_group.param_run(param_ind, text.as_str());
+                                let param_result=param_group.param_parse(param_ind, text.as_str());
 
                                 //
                                 param_result.map(|param_result|{
@@ -354,7 +352,8 @@ pub fn parse_start<'a>(
                             repeat:param_group.repeat(),
                         }
                     });
-                } else {
+                } else
+                {
                     //
                     let mut record_val_ind=record_val_start;
                     let mut param_group_ind=0;
@@ -366,7 +365,7 @@ pub fn parse_start<'a>(
                         //some might not have any params and are invalid
                         //  should ignore (skip over) if no params?
                         if param_group.params_num()==0 {
-                            ok=false; //not really necessary?
+                            ok=false; //not really necessary? why not?
                             break;
                         }
 
@@ -449,7 +448,7 @@ pub fn parse_start<'a>(
                                             {
                                                 let val = record_vals.get(record_val_ind2).unwrap();
                                                 let text=texts.get(val.text_ind).unwrap();
-                                                let v=param_group.param_run(pattern_ind, text.as_str());
+                                                let v=param_group.param_parse(pattern_ind, text.as_str());
 
                                                 v.map(|v|(param_group.param_type_name(pattern_ind).unwrap(),v))
                                             }).is_some()
@@ -594,22 +593,50 @@ pub fn parse_start<'a>(
 
                                 //get vals for params
                                 for param_ind in 0..param_group.params_num() {
+                                    // println!("=== p={param_ind}, r={record_val_ind3} rl={}",record_vals.len());
+
+                                    //only used
+                                    if record_val_ind3 == record_vals.len() {
+                                        // println!("hmm2 p={param_ind} r={record_val_ind3} {:?}",record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)));
+                                        if let Some(param_optional)=param_group.param_optional() {
+                                            if param_ind >=param_optional {
+                                                param_found=true;
+                                                param_optional_used=true;
+                                            }
+                                        }
+                                        break;
+                                    }
                                     //
-                                    param_found=param_group.param_type_id(param_ind).map(|param_type_id|{
-                                        record_attempted_parse_vals
+                                    let param_type_id=param_group.param_type_id(param_ind);
+
+                                    if let Some(param_type_id)=param_type_id{
+                                        let param_type_name=param_group.param_type_name(param_ind).unwrap();
+
+                                        let param_parsed=record_attempted_parse_vals
                                             .entry(record_val_ind3).or_default() //-record_val_start
                                             .entry(param_type_id).or_insert_with(||
                                         {
                                             let val = record_vals.get(record_val_ind3).unwrap();
                                             let text=texts.get(val.text_ind).unwrap();
-                                            let v=param_group.param_run(param_ind, text.as_str());
 
-                                            v.map(|v|(param_group.param_type_name(param_ind).unwrap(),v))
-                                        }).is_some()
-                                    }).unwrap_or(true);
+                                            //does none repesent param_any? don't think so, just the parse failed
+                                            //  storing none just tells it that the parse has already been attempted and failed
+                                            let v=param_group.param_parse(param_ind, text.as_str());
+
+                                            v.map(|v|(param_type_name,v))
+                                        });
+                                        param_found=param_parsed.is_some();
+                                    } else { //does it mean any? yes..
+                                        param_found=true;
+                                    }
+
 
                                     //
                                     if param_found { //param matches value
+                                        // println!("hmm1 p={param_ind} r={record_val_ind3} {:?}, rlen={}",
+                                        //     record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)),
+                                        //     record_vals.len(),
+                                        // );
                                         record_val_ind3+=1;
                                         //println!("====x {record_val_ind3}");
                                     // } else if let Some(param_optional)=param_group.param_optional() {
@@ -619,6 +646,9 @@ pub fn parse_start<'a>(
                                     //         break;
                                     //     }
                                     } else {
+                                        // println!("hmm0 p={param_ind} r={record_val_ind3} {:?}",record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)));
+
+                                        //only handles incorrect param type, not too little record vals
                                         if let Some(param_optional)=param_group.param_optional() {
                                             if param_ind >=param_optional {
                                                 param_found=true;
@@ -628,10 +658,11 @@ pub fn parse_start<'a>(
 
                                         break;
                                     }
-                                } //end for
+                                } //end for (param_ind)
 
                                 //after looping through params
                                 if param_found { //all success
+                                    // println!("==a");
                                     record_val_ind2=record_val_ind3;
                                     many_count+=1;
 
@@ -639,13 +670,14 @@ pub fn parse_start<'a>(
                                         continue;
                                     }
                                 } else if !param_group.optional() && (!param_group.repeat() || many_count==0) {
+                                    // println!("==b");
                                     // ok2=false; //node fail
                                     ok=false; //node fail
                                 }
 
                                 //
                                 break;
-                            } //end loop
+                            } //end loop (repeats)
 
                             //
                             // println!("group1 is {:?}, many_count={many_count}, ok2={ok}",param_group.name());
@@ -705,43 +737,43 @@ pub fn parse_start<'a>(
                                 break;
                             }
                         } //
-                    } //end while
+                    } //end while (record_val_ind)
 
                     //
                     if ok {
-                        //skip optional param groups
-                        while param_group_ind<node.param_groups_num() && node.param_group(param_group_ind).unwrap().optional() {
+                        //skip (remaining?) optional param groups
+                        while param_group_ind<node.param_groups_num() &&
+                            (node.param_group(param_group_ind).unwrap().optional() || node.param_group(param_group_ind).unwrap().param_optional()==Some(0))
+                        {
                             let param_group=node.param_group(param_group_ind).unwrap();
 
                             // println!("group2 is {:?}, ",param_group.name());
 
+                            //
+                            let group_name_text_ind= param_group.name().map(|group_name|{
+                                if let Some(text_ind)=text_map.get(group_name) {
+                                    *text_ind
+                                } else {
+                                    let text_ind=texts.len();
+                                    text_map.insert(group_name.to_string(), text_ind);
+                                    texts.push(group_name.to_string());
+                                    text_ind
+                                }
+                            });
 
-                            {
-                                //
-                                let group_name_text_ind= param_group.name().map(|group_name|{
-                                    if let Some(text_ind)=text_map.get(group_name) {
-                                        *text_ind
-                                    } else {
-                                        let text_ind=texts.len();
-                                        text_map.insert(group_name.to_string(), text_ind);
-                                        texts.push(group_name.to_string());
-                                        text_ind
-                                    }
-                                });
+                            //
+                            cur_param_groups.push(TempParamGroup {
+                                param_group_ind,
+                                conf_param_group:conf::ParamGroup {
+                                    conf_values:0..0,
+                                    name: group_name_text_ind,
+                                    params_num: param_group.params_num(),
+                                    optional:param_group.optional(),
+                                    repeat:param_group.repeat(),
+                                }
+                            });
 
-                                //
-                                cur_param_groups.push(TempParamGroup {
-                                    param_group_ind,
-                                    conf_param_group:conf::ParamGroup {
-                                        conf_values:0..0,
-                                        name: group_name_text_ind,
-                                        params_num: param_group.params_num(),
-                                        optional:param_group.optional(),
-                                        repeat:param_group.repeat(),
-                                    }
-                                });
-                            }
-
+                            //
                             param_group_ind+=1;
                         }
 
@@ -754,7 +786,7 @@ pub fn parse_start<'a>(
                             // );
                         }
                     }
-                }
+                } //
 
                 //enforce tag once (only one of the tag allowed)
                 if ok && node.has_tag() && node.tag_once() && tags_useds.last().unwrap().contains(&first_val_text) {

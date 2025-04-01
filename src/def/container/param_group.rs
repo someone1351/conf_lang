@@ -49,7 +49,7 @@ impl<'a> ParamGroupContainer<'a> {
         param_group.params.len()
     }
 
-    pub fn param_run(&self,item_ind:usize,val:&str) -> Option<Box<dyn Any+Send+Sync>> {
+    pub fn param_parse(&self,item_ind:usize,val:&str) -> Option<Box<dyn Any+Send+Sync>> {
         let node=self.def.nodes.get(self.node_ind).unwrap();
         let param_group=node.param_groups.get(self.param_group_ind).unwrap();
         let param=param_group.params.get(item_ind);

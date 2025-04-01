@@ -150,16 +150,48 @@ fn write_test() {
 }
 
 fn walk_test3() {
+
+    // let def = conf_lang::Def::new()
+    //     .group()
+    //         .param_any()
+    //     .group()
+    //         .param_optional()
+    //         .param_parse::<bool>()
+    //     .group()
+    //         .param_any()
+    //     ;
+    // let def = conf_lang::Def::new()
+    //     .group()
+    //         .param_any()
+    //     .group()
+    //         .param_optional()
+    //         .param_any()
+    //     ;
+
     let def = conf_lang::Def::new()
         .group()
             .param_any()
         .group()
+            .param_any()
             .param_optional()
             .param_any()
         ;
 
+    // let def = conf_lang::Def::new()
+    //     .param_any()
+    //     .param_optional()
+    //     .param_any()
+    //     ;
+
+    // let def = conf_lang::Def::new()
+    //     .group()
+    //         .param_any()
+    //     .group().goptional()
+    //         .param_any()
+    //     ;
+
     let src="
-hello
+hello a b
     ";
 
     let conf=match def.get_root_branch().parse(src, true,Some(&PathBuf::from("test3"))) {
@@ -190,9 +222,11 @@ hello
 
 fn main() {
     walk_test1();
-    // println!("===");
+    println!("===");
     walk_test2();
+    println!("===");
     write_test();
+    println!("===");
     walk_test3();
 }
 
