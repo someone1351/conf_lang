@@ -220,15 +220,101 @@ hello a b
     }
 }
 
+
+
+fn walk_test4() {
+    let def = conf_lang::Def::new()
+        .entry().elabel("label1").param_any()
+        .entry().elabel("label2").param_any().param_any()
+        ;
+
+
+    let src="
+a b
+c
+    ";
+
+    let conf=match def.get_root_branch().parse(src, true,Some(&PathBuf::from("test4"))) {
+        Ok(conf)=>conf,
+        Err(e)=>{
+            println!("{}",e.msg(Some(src)));
+            return;
+        }
+    };
+
+    let res=conf.root().walk( |walk|{
+        let mut all_values: Vec<Vec<&str>> = Vec::new();
+
+        for group_ind in 0..walk.record().param_groups_num() {
+            let group=walk.record().param_group(group_ind);
+            let group_values=group.values().map(|v|v.str()).collect::<Vec<_>>();
+            all_values.push(group_values);
+        }
+
+        println!("{all_values:?}");
+
+    });
+
+    if let Err(e)=res {
+        println!("{}",e.msg(conf.src()));
+    }
+}
+
+
+fn walk_test5() {
+    let def = conf_lang::Def::new()
+        .entry().elabel("label1")
+            .group().param_any()
+            .group().param_any()
+        .entry().elabel("label2")
+            .group().param_any()
+            .group().param_any()
+            .group().param_any()
+        ;
+
+
+    let src="
+a b
+c d e
+    ";
+
+    let conf=match def.get_root_branch().parse(src, true,Some(&PathBuf::from("test5"))) {
+        Ok(conf)=>conf,
+        Err(e)=>{
+            println!("{}",e.msg(Some(src)));
+            return;
+        }
+    };
+
+    let res=conf.root().walk( |walk|{
+        let mut all_values: Vec<Vec<&str>> = Vec::new();
+
+        for group_ind in 0..walk.record().param_groups_num() {
+            let group=walk.record().param_group(group_ind);
+            let group_values=group.values().map(|v|v.str()).collect::<Vec<_>>();
+            all_values.push(group_values);
+        }
+
+        println!("{all_values:?}");
+
+    });
+
+    if let Err(e)=res {
+        println!("{}",e.msg(conf.src()));
+    }
+}
 fn main() {
     walk_test1();
-    println!("===");
+    println!("======");
     walk_test2();
-    println!("===");
+    println!("======");
     write_test();
-    println!("===");
+    println!("======");
     walk_test3();
-    println!("===");
+    println!("======");
+    walk_test4();
+    println!("======");
+    walk_test5();
 }
 
 fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, Conf> {

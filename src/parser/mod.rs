@@ -123,7 +123,7 @@ fn parse_single_group(
     conf_val_start : usize,
     all_val_end : usize,
 
-) -> Option<bool> { //Some(true)=ok true,Some(false)=ok false break,None=continue
+) -> bool { //true=ok, fail=continue
 
     let record_vals_num=record_vals.len()-record_val_start;
 
@@ -140,7 +140,8 @@ fn parse_single_group(
         || ((param_group.repeat() || record_vals_num<params_num) && record_vals_num%params_num >= param_optional)
     {} else {
         // continue;
-        return None;
+        // return None;
+        return false;
     }
 
     //
@@ -148,7 +149,11 @@ fn parse_single_group(
         let record_val = record_vals.get(record_val_ind).unwrap();
         let param_ind= (record_val_ind-record_val_start)%params_num;
 
-        if let Some(val_type_id) = param_group.param_type_id(param_ind) { //check func, anys not checked
+        //where are anys checked?
+        //  it checks each param if it has a type,
+        //  and if it does but the parse fails,
+        //  then the node failed, and should try the next one
+        if let Some(val_type_id) = param_group.param_type_id(param_ind) { //check has parse func, anys not checked
             let parsed_vals=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
 
             let parsed_val=parsed_vals.entry(val_type_id).or_insert_with(||{
@@ -159,14 +164,16 @@ fn parse_single_group(
 
                 //
                 param_result.map(|param_result|{
-                    (param_group.param_type_name(param_ind).unwrap(),param_result)
+                    let param_type_name=param_group.param_type_name(param_ind).unwrap();
+                    (param_type_name,param_result)
                 })
             });
 
-            if parsed_val.is_none() {
-                // ok=false;
+            if parsed_val.is_none() { //if parse fails, then try dif node
+                // ok=false; //why is it not ok?
                 // break;
-                return Some(false);
+                // return Some(false);
+                return false;
             }
         }
     }
@@ -194,7 +201,8 @@ fn parse_single_group(
         }
     });
 
-    Some(true)
+    // Some(true)
+    true
 }
 
 // let mut texts=Vec::<String>::new();
@@ -445,7 +453,7 @@ fn parse_group(
     cur_param_groups: &mut Vec<TempParamGroup>,
     conf_val_start : usize,
     param_group_ind:&mut usize,
-) -> Option<bool> { //Some(true)=ok=true,break, Some(false) = ok=false,break, None=continue;
+) -> bool {
 
     let param_group=node.param_group(*param_group_ind).unwrap();
 
@@ -454,7 +462,7 @@ fn parse_group(
     let mut param_optional_used=false;
     let mut record_val_ind2=*record_val_ind;
 
-    let mut ok=true;
+    // let mut ok=true;
 
     // let mut ok2=true;
 
@@ -543,7 +551,9 @@ fn parse_group(
         } else if !param_group.optional() && (!param_group.repeat() || many_count==0) {
             // println!("==b");
             // ok2=false; //node fail
-            ok=false; //node fail
+            // ok=false; //node fail
+            // return Some(false);
+            return false;
         }
 
         //
@@ -553,14 +563,14 @@ fn parse_group(
     //
     // println!("group1 is {:?}, many_count={many_count}, ok2={ok}",param_group.name());
 
-    //
-    // if !ok2 {
-    //     break;
+    // //
+    // // if !ok2 {
+    // //     break;
+    // // }
+    // if !ok {
+    //     // break;
+    //     return Some(false);
     // }
-    if !ok {
-        // break;
-        return Some(false);
-    }
 
     //
     //after completing a param group, store it
@@ -603,15 +613,18 @@ fn parse_group(
     *param_group_ind+=1;
 
     //
-    if *param_group_ind==node.param_groups_num() { //is last param group
-        // record_val_ind=record_last_val_ind; //restore record_val_ind to last successful param_group match //why?
-        //println!("====6");
-        // break;
-        return Some(ok); //ok should be true?
+    // if *param_group_ind==node.param_groups_num() { //is last param group
+    //     // record_val_ind=record_last_val_ind; //restore record_val_ind to last successful param_group match //why?
+    //     //println!("====6");
+    //     // break;
+    //     // return Some(ok); //ok should be true?
+    //     return Some(true);
 
-    }
+    // }
 
-    None
+    // None
+
+    true
 } //
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
@@ -779,6 +792,8 @@ pub fn parse_start<'a>(
 
             let mut cur_param_groups=Vec::<TempParamGroup>::new();
 
+            // println!("=== {:?}",record_vals.iter().map(|x|texts.get(x.text_ind).unwrap()).collect::<Vec<_>>());
+
             //look at nodes
             for node in cur_branch.get_tag_nodes(first_val_text.as_str()).chain(cur_branch.get_tagless_nodes()) {
 
@@ -787,119 +802,128 @@ pub fn parse_start<'a>(
                 let record_val_start=node.has_tag().then_some(1).unwrap_or(0);
                 // let record_vals_num=record_vals.len()-record_val_start;
 
-                //
-                let mut ok=true;
+
+
+                // println!("== {:?}",node.label());
 
                 if node.param_groups_num()==1 { //handle single group, more efficient then using code below in else, could disable this and only use code in else
-                    match parse_single_group(
-                        node,record_vals,record_val_start,&mut record_attempted_parse_vals,&mut texts,&mut text_map,&mut cur_param_groups,conf_val_start,all_val_end,
-                    ) {
-                        Some(true) => {
-                            // ok=true;
-                        }
-                        Some(false) => {
-                            // ok=false; //not necessary since breaking out and ok not used outside
-                            break; //should it really be breaking out? wouldn't it want to continue with the next node?
-                        }
-                        None => {
-                            continue;
-                        }
+                    if !parse_single_group(
+                        node,record_vals,record_val_start,&mut record_attempted_parse_vals,
+                        &mut texts,&mut text_map,&mut cur_param_groups,conf_val_start,all_val_end)
+                    {
+                        continue;
                     }
+
+                    //     // println!("single true");
+                    //     // break;
+                    // } else {
+                    // }
+                    // println!("single false");
+
                 } else {
+                    // println!("other {}",node.param_groups_num());
                     //
                     let mut record_val_ind=record_val_start;
                     let mut param_group_ind=0;
 
-                    while record_val_ind<record_vals.len() {
-                        //println!("==while g={param_group_ind}: v={record_val_ind}");
-                        let param_group=node.param_group(param_group_ind).unwrap();
-
-                        //some might not have any params and are invalid
-                        //  should ignore (skip over) if no params?
-                        if param_group.params_num()==0 {
-                            ok=false; //not really necessary? why not?
-                            break;
-                        }
-
-                        //handle adjacent param groups that share a pattern
-                        //  do not use patterns when using param_optional
-                        // println!("gs {:?}",param_group.similar());
-
-                        if parse_adjacent_groups(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
-                            &mut texts,&mut text_map,&mut cur_param_groups,&mut  param_group_ind,conf_val_start,
-                        ) {
-                            continue;
-                        }
-
-                        //(else?) handle param group
-                        if let Some(x)=parse_group(
-                            node,
-                            record_vals,
-                            &mut record_val_ind,
-                            &mut record_attempted_parse_vals,
-                            &mut texts,
-                            &mut text_map,
-                            &mut cur_param_groups,
-                            conf_val_start,
-                            &mut param_group_ind,
-                        ) {
-                            ok=x;
-                            break;
-                        }
-
-                    } //end while (record_val_ind)
-
                     //
-                    if ok {
-                        //skip (remaining?) optional param groups
-                        while param_group_ind<node.param_groups_num() &&
-                            (node.param_group(param_group_ind).unwrap().optional() || node.param_group(param_group_ind).unwrap().param_optional()==Some(0))
-                        {
+                    {
+
+                        let mut node_ok=true;
+
+                        //
+                        while record_val_ind<record_vals.len() {
+                            //println!("==while g={param_group_ind}: v={record_val_ind}");
                             let param_group=node.param_group(param_group_ind).unwrap();
 
-                            // println!("group2 is {:?}, ",param_group.name());
+                            //some might not have any params and are invalid
+                            //  should ignore (skip over) if no params?
+                            if param_group.params_num()==0 {
+                                node_ok=false; //not really necessary? why not? since record_ind ...
+                                break;
+                            }
+
+                            //handle adjacent param groups that share a pattern
+                            //  do not use patterns when using param_optional
+                            // println!("gs {:?}",param_group.similar());
+
+
+                            if parse_adjacent_groups(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
+                                &mut texts,&mut text_map,&mut cur_param_groups,&mut param_group_ind,conf_val_start,
+                            ) {
+                                //on succeed, start again from top
+                                continue;
+                            }
+
+                            //(else?) handle param group
+                            if !parse_group(
+                                node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
+                                &mut texts,&mut text_map,&mut cur_param_groups,conf_val_start,&mut param_group_ind,
+                            ) {
+                                node_ok=false;
+                                break;
+                            }
 
                             //
-                            let group_name_text_ind= param_group.name().map(|group_name|{
-                                if let Some(text_ind)=text_map.get(group_name) {
-                                    *text_ind
-                                } else {
-                                    let text_ind=texts.len();
-                                    text_map.insert(group_name.to_string(), text_ind);
-                                    texts.push(group_name.to_string());
-                                    text_ind
-                                }
-                            });
+                            if param_group_ind==node.param_groups_num() { //is last param group
+                                break;
+                            }
+                        } //end while (record_val_ind)
 
-                            //
-                            cur_param_groups.push(TempParamGroup {
-                                param_group_ind,
-                                conf_param_group:conf::ParamGroup {
-                                    conf_values:0..0,
-                                    name: group_name_text_ind,
-                                    params_num: param_group.params_num(),
-                                    optional:param_group.optional(),
-                                    repeat:param_group.repeat(),
-                                }
-                            });
-
-                            //
-                            param_group_ind+=1;
-                        }
-
-                        //failed to go through all record vals or failed to go through all param groups
-                        if record_val_ind!=record_vals.len() || param_group_ind!=node.param_groups_num() {
-                            ok=false;
-                            // println!("a3 {} {}, {} {}",
-                            //     record_val_ind,record_vals.len(),
-                            //     param_group_ind,node.param_groups_num(),
-                            // );
+                        if !node_ok {
+                            continue; //try next node
                         }
                     }
-                } //
+
+                    //skip (remaining?) optional param groups
+                    while param_group_ind<node.param_groups_num() &&
+                        (node.param_group(param_group_ind).unwrap().optional() || node.param_group(param_group_ind).unwrap().param_optional()==Some(0))
+                    {
+                        let param_group=node.param_group(param_group_ind).unwrap();
+
+                        // println!("group2 is {:?}, ",param_group.name());
+
+                        //
+                        let group_name_text_ind= param_group.name().map(|group_name|{
+                            if let Some(text_ind)=text_map.get(group_name) {
+                                *text_ind
+                            } else {
+                                let text_ind=texts.len();
+                                text_map.insert(group_name.to_string(), text_ind);
+                                texts.push(group_name.to_string());
+                                text_ind
+                            }
+                        });
+
+                        //
+                        cur_param_groups.push(TempParamGroup {
+                            param_group_ind,
+                            conf_param_group:conf::ParamGroup {
+                                conf_values:0..0,
+                                name: group_name_text_ind,
+                                params_num: param_group.params_num(),
+                                optional:param_group.optional(),
+                                repeat:param_group.repeat(),
+                            }
+                        });
+
+                        //
+                        param_group_ind+=1;
+                    }
+
+                    //failed to go through all record vals or failed to go through all param groups
+                    if record_val_ind!=record_vals.len() || param_group_ind!=node.param_groups_num() {
+                        // node_ok=false;
+                        // // println!("a3 {} {}, {} {}",
+                        // //     record_val_ind,record_vals.len(),
+                        // //     param_group_ind,node.param_groups_num(),
+                        // // );
+                        continue; //try next node
+                    }
+                } //else if param_groups_num>1
 
                 //enforce tag once (only one of the tag allowed)
-                if ok && node.has_tag() && node.tag_once() && tags_useds.last().unwrap().contains(&first_val_text) {
+                if node.has_tag() && node.tag_once() && tags_useds.last().unwrap().contains(&first_val_text) { //node_ok &&
                     return Err(ParseError {
                         path:path.map(|p|p.to_path_buf()),
                         loc: record_vals.first().unwrap().start_loc,
@@ -908,16 +932,14 @@ pub fn parse_start<'a>(
                 }
 
                 //
-                if ok {
-                    //store used tags
-                    if node.has_tag() {
-                        tags_useds.last_mut().unwrap().insert(first_val_text.clone());
-                    }
-
-                    //store found node
-                    found_node=Some(node);
-                    break;
+                //store used tags
+                if node.has_tag() {
+                    tags_useds.last_mut().unwrap().insert(first_val_text.clone());
                 }
+
+                //store found node
+                found_node=Some(node);
+                break;
             }
 
             //err if no found_node
