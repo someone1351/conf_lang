@@ -86,6 +86,7 @@ use error::{ParseError, ParseErrorType};
 
 
 use crate::def::node::GroupSimilar;
+use crate::NodeContainer;
 
 use super::conf::{self,Record,Value};
 use super::def::container::branch::BranchContainer;
@@ -94,6 +95,117 @@ use super::def::container::node_children::NodeChildrenContainer;
 use super::lexer::{Lexer, Token};
 use super::Conf;
 
+struct TempParamGroup {
+    param_group_ind:usize,
+    conf_param_group:conf::ParamGroup,
+}
+//
+// #[derive(Clone)]
+struct TempRecord {
+    parent : Option<usize>,
+    children_records : Vec<usize>,
+    pub children_text:Option<Range<usize>>,
+
+    pub param_groups : Range<usize>,
+    pub values : Range<usize>,
+    pub node_label : Option<usize>,
+    pub branch_name : Option<usize>,
+    tag:bool,
+}
+
+// let mut texts=Vec::<String>::new();
+// let mut text_map=HashMap::<String,usize>::new();
+// let mut all_param_groups = Vec::<conf::ParamGroup>::new();
+// let mut all_values = Vec::<Value>::new();
+// let mut all_parsed_values= Vec::new();
+// let mut cur_parent = 0;
+// let mut last_indent = 0;
+// let mut tags_useds = vec![HashSet::<String>::new()]; //tags_useds[node_depth] = parent_tags_used
+// let mut node_children_stk=Vec::<NodeChildrenContainer>::new();
+
+fn parse_single_group(
+    node:NodeContainer,record_vals: &[Value],
+    record_val_start: usize,
+    record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
+    texts:&mut Vec<String>,
+    text_map:&mut HashMap<String,usize>,
+    cur_param_groups: &mut Vec<TempParamGroup>,
+    conf_val_start : usize,
+    all_val_end : usize,
+
+) -> Option<bool> { //Some(true)=ok true,Some(false)=ok false break,None=continue
+
+    let record_vals_num=record_vals.len()-record_val_start;
+
+    //
+    let param_group=node.param_group(0).unwrap();
+    let params_num=param_group.params_num();
+    let param_optional=param_group.param_optional().unwrap_or(params_num);
+
+    //skip on invalid params num
+    if record_vals_num==params_num
+        || (param_group.optional() && record_vals_num==0) // && group.params_num()!=0
+        || (param_group.repeat() && params_num!=0 && record_vals_num!=0 && record_vals_num%params_num==0)
+
+        || ((param_group.repeat() || record_vals_num<params_num) && record_vals_num%params_num >= param_optional)
+    {} else {
+        // continue;
+        return None;
+    }
+
+    //
+    for record_val_ind in record_val_start .. record_vals.len() {
+        let record_val = record_vals.get(record_val_ind).unwrap();
+        let param_ind= (record_val_ind-record_val_start)%params_num;
+
+        if let Some(val_type_id) = param_group.param_type_id(param_ind) { //check func, anys not checked
+            let parsed_vals=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
+
+            let parsed_val=parsed_vals.entry(val_type_id).or_insert_with(||{
+                let text=texts.get(record_val.text_ind).unwrap();
+
+                //run param func
+                let param_result=param_group.param_parse(param_ind, text.as_str());
+
+                //
+                param_result.map(|param_result|{
+                    (param_group.param_type_name(param_ind).unwrap(),param_result)
+                })
+            });
+
+            if parsed_val.is_none() {
+                // ok=false;
+                // break;
+                return Some(false);
+            }
+        }
+    }
+
+    //
+    let group_name_text_ind= param_group.name().map(|group_name|{
+        if let Some(text_ind)=text_map.get(group_name) {
+            *text_ind
+        } else {
+            let text_ind=texts.len();
+            text_map.insert(group_name.to_string(), text_ind);
+            texts.push(group_name.to_string());
+            text_ind
+        }
+    });
+
+    cur_param_groups.push(TempParamGroup {
+        param_group_ind:0,
+        conf_param_group:conf::ParamGroup {
+            conf_values: conf_val_start+record_val_start..all_val_end,
+            name: group_name_text_ind,
+            params_num,
+            optional:param_group.optional(),
+            repeat:param_group.repeat(),
+        }
+    });
+
+    Some(true)
+}
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
     src : &'a str,
@@ -123,24 +235,6 @@ pub fn parse_start<'a>(
     // eol => [\n]|[\r][\n]
     // not_eols => ^eol*
 
-
-    struct TempParamGroup {
-        param_group_ind:usize,
-        conf_param_group:conf::ParamGroup,
-    }
-    //
-    // #[derive(Clone)]
-    struct TempRecord {
-        parent : Option<usize>,
-        children_records : Vec<usize>,
-        pub children_text:Option<Range<usize>>,
-
-        pub param_groups : Range<usize>,
-        pub values : Range<usize>,
-        pub node_label : Option<usize>,
-        pub branch_name : Option<usize>,
-        tag:bool,
-    }
 
     let mut temp_records = vec![TempRecord {
         parent: None,
@@ -224,7 +318,7 @@ pub fn parse_start<'a>(
             }));
 
             let all_val_end=all_values.len();
-            let record_vals=&all_values[conf_val_start..all_val_end];
+            let record_vals: &[Value]=&all_values[conf_val_start..all_val_end];
 
             if indent==last_indent+1 { //parent=cur_parent.child.last
                 cur_parent=temp_records[cur_parent].children_records.last().cloned().unwrap();
@@ -284,76 +378,27 @@ pub fn parse_start<'a>(
                 cur_param_groups.clear();
 
                 let record_val_start=node.has_tag().then_some(1).unwrap_or(0);
-                let record_vals_num=record_vals.len()-record_val_start;
+                // let record_vals_num=record_vals.len()-record_val_start;
 
                 //
                 let mut ok=true;
 
                 if node.param_groups_num()==1 { //handle single group, more efficient then using code below in else, could disable this and only use code in else
-                    //
-                    let param_group=node.param_group(0).unwrap();
-                    let params_num=param_group.params_num();
-                    let param_optional=param_group.param_optional().unwrap_or(params_num);
-
-                    //skip on invalid params num
-                    if record_vals_num==params_num
-                        || (param_group.optional() && record_vals_num==0) // && group.params_num()!=0
-                        || (param_group.repeat() && params_num!=0 && record_vals_num!=0 && record_vals_num%params_num==0)
-
-                        || ((param_group.repeat() || record_vals_num<params_num) && record_vals_num%params_num >= param_optional)
-                    {} else { continue; }
-
-                    //
-                    for record_val_ind in record_val_start .. record_vals.len() {
-                        let record_val = record_vals.get(record_val_ind).unwrap();
-                        let param_ind= (record_val_ind-record_val_start)%params_num;
-
-                        if let Some(val_type_id) = param_group.param_type_id(param_ind) { //check func, anys not checked
-                            let parsed_vals=record_attempted_parse_vals.entry(record_val_ind).or_default(); //-record_val_start
-
-                            let parsed_val=parsed_vals.entry(val_type_id).or_insert_with(||{
-                                let text=texts.get(record_val.text_ind).unwrap();
-
-                                //run param func
-                                let param_result=param_group.param_parse(param_ind, text.as_str());
-
-                                //
-                                param_result.map(|param_result|{
-                                    (param_group.param_type_name(param_ind).unwrap(),param_result)
-                                })
-                            });
-
-                            if parsed_val.is_none() {
-                                ok=false;
-                                break;
-                            }
+                    match parse_single_group(
+                        node,record_vals,record_val_start,&mut record_attempted_parse_vals,&mut texts,&mut text_map,&mut cur_param_groups,conf_val_start,all_val_end,
+                    ) {
+                        Some(true) => {
+                            // ok=true;
+                        }
+                        Some(false) => {
+                            // ok=false; //not necessary since breaking out and ok not used outside
+                            break;
+                        }
+                        None => {
+                            continue;
                         }
                     }
-
-                    //
-                    let group_name_text_ind= param_group.name().map(|group_name|{
-                        if let Some(text_ind)=text_map.get(group_name) {
-                            *text_ind
-                        } else {
-                            let text_ind=texts.len();
-                            text_map.insert(group_name.to_string(), text_ind);
-                            texts.push(group_name.to_string());
-                            text_ind
-                        }
-                    });
-
-                    cur_param_groups.push(TempParamGroup {
-                        param_group_ind:0,
-                        conf_param_group:conf::ParamGroup {
-                            conf_values: conf_val_start+record_val_start..all_val_end,
-                            name: group_name_text_ind,
-                            params_num,
-                            optional:param_group.optional(),
-                            repeat:param_group.repeat(),
-                        }
-                    });
-                } else
-                {
+                } else {
                     //
                     let mut record_val_ind=record_val_start;
                     let mut param_group_ind=0;

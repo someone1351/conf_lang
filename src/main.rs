@@ -228,6 +228,7 @@ fn main() {
     write_test();
     println!("===");
     walk_test3();
+    println!("===");
 }
 
 fn load_confs<P: AsRef<Path>>(def:conf_lang::Def,dir:P) -> HashMap<PathBuf, Conf> {
