@@ -113,7 +113,7 @@ struct TempRecord {
     tag:bool,
 }
 
-fn parse_single_group(
+fn do_node_single_group(
     node:NodeContainer,record_vals: &[Value],
     record_val_start: usize,
     record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
@@ -205,18 +205,7 @@ fn parse_single_group(
     true
 }
 
-// let mut texts=Vec::<String>::new();
-// let mut text_map=HashMap::<String,usize>::new();
-// let mut all_param_groups = Vec::<conf::ParamGroup>::new();
-// let mut all_values = Vec::<Value>::new();
-// let mut all_parsed_values= Vec::new();
-// let mut cur_parent = 0;
-// let mut last_indent = 0;
-// let mut tags_useds = vec![HashSet::<String>::new()]; //tags_useds[node_depth] = parent_tags_used
-// let mut node_children_stk=Vec::<NodeChildrenContainer>::new();
-
-
-fn parse_group_adjacents(
+fn do_node_group_adjacents(
     node:NodeContainer,record_vals: &[Value],
     record_val_ind: &mut usize,
     record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
@@ -444,7 +433,7 @@ fn parse_group_adjacents(
 
 }
 
-fn parse_group(
+fn do_node_group(
     node:NodeContainer,record_vals: &[Value],
     record_val_ind: &mut usize,
     record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
@@ -807,7 +796,7 @@ pub fn parse_start<'a>(
                 // println!("== {:?}",node.label());
 
                 if node.param_groups_num()==1 { //handle single group, more efficient then using code below in else, could disable this and only use code in else
-                    if !parse_single_group(
+                    if !do_node_single_group(
                         node,record_vals,record_val_start,&mut record_attempted_parse_vals,
                         &mut texts,&mut text_map,&mut cur_param_groups,conf_val_start,all_val_end)
                     {
@@ -848,7 +837,7 @@ pub fn parse_start<'a>(
                             // println!("gs {:?}",param_group.similar());
 
 
-                            if parse_group_adjacents(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
+                            if do_node_group_adjacents(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
                                 &mut texts,&mut text_map,&mut cur_param_groups,&mut param_group_ind,conf_val_start,
                             ) {
                                 //on succeed, start again from top
@@ -856,7 +845,7 @@ pub fn parse_start<'a>(
                             }
 
                             //(else?) handle param group
-                            if !parse_group(
+                            if !do_node_group(
                                 node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
                                 &mut texts,&mut text_map,&mut cur_param_groups,conf_val_start,&mut param_group_ind,
                             ) {
