@@ -216,7 +216,7 @@ fn parse_single_group(
 // let mut node_children_stk=Vec::<NodeChildrenContainer>::new();
 
 
-fn parse_adjacent_groups(
+fn parse_group_adjacents(
     node:NodeContainer,record_vals: &[Value],
     record_val_ind: &mut usize,
     record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
@@ -848,7 +848,7 @@ pub fn parse_start<'a>(
                             // println!("gs {:?}",param_group.similar());
 
 
-                            if parse_adjacent_groups(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
+                            if parse_group_adjacents(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
                                 &mut texts,&mut text_map,&mut cur_param_groups,&mut param_group_ind,conf_val_start,
                             ) {
                                 //on succeed, start again from top
