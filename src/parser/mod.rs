@@ -435,6 +435,184 @@ fn parse_adjacent_groups(
     false
 
 }
+
+fn parse_group(
+    node:NodeContainer,record_vals: &[Value],
+    record_val_ind: &mut usize,
+    record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
+    texts:&mut Vec<String>,
+    text_map:&mut HashMap<String,usize>,
+    cur_param_groups: &mut Vec<TempParamGroup>,
+    conf_val_start : usize,
+    param_group_ind:&mut usize,
+) -> Option<bool> { //Some(true)=ok=true,break, Some(false) = ok=false,break, None=continue;
+
+    let param_group=node.param_group(*param_group_ind).unwrap();
+
+    let mut many_count=0;
+    let mut param_found=false;
+    let mut param_optional_used=false;
+    let mut record_val_ind2=*record_val_ind;
+
+    let mut ok=true;
+
+    // let mut ok2=true;
+
+    loop { //for repeats
+        //println!("==loop repeat {record_val_ind}, {record_val_ind2}");
+        let mut record_val_ind3=record_val_ind2;
+
+        //get vals for params
+        for param_ind in 0..param_group.params_num() {
+            // println!("=== p={param_ind}, r={record_val_ind3} rl={}",record_vals.len());
+
+            //only used
+            if record_val_ind3 == record_vals.len() {
+                // println!("hmm2 p={param_ind} r={record_val_ind3} {:?}",record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)));
+                if let Some(param_optional)=param_group.param_optional() {
+                    if param_ind >=param_optional {
+                        param_found=true;
+                        param_optional_used=true;
+                    }
+                }
+                break;
+            }
+            //
+            let param_type_id=param_group.param_type_id(param_ind);
+
+            if let Some(param_type_id)=param_type_id{
+                let param_type_name=param_group.param_type_name(param_ind).unwrap();
+
+                let param_parsed=record_attempted_parse_vals
+                    .entry(record_val_ind3).or_default() //-record_val_start
+                    .entry(param_type_id).or_insert_with(||
+                {
+                    let val = record_vals.get(record_val_ind3).unwrap();
+                    let text=texts.get(val.text_ind).unwrap();
+
+                    //does none repesent param_any? don't think so, just the parse failed
+                    //  storing none just tells it that the parse has already been attempted and failed
+                    let v=param_group.param_parse(param_ind, text.as_str());
+
+                    v.map(|v|(param_type_name,v))
+                });
+                param_found=param_parsed.is_some();
+            } else { //does it mean any? yes..
+                param_found=true;
+            }
+
+
+            //
+            if param_found { //param matches value
+                // println!("hmm1 p={param_ind} r={record_val_ind3} {:?}, rlen={}",
+                //     record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)),
+                //     record_vals.len(),
+                // );
+                record_val_ind3+=1;
+                //println!("====x {record_val_ind3}");
+            // } else if let Some(param_optional)=param_group.param_optional() {
+            //     if param_ind >=param_optional {
+            //         param_found=true;
+            //     } else {
+            //         break;
+            //     }
+            } else {
+                // println!("hmm0 p={param_ind} r={record_val_ind3} {:?}",record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)));
+
+                //only handles incorrect param type, not too little record vals
+                if let Some(param_optional)=param_group.param_optional() {
+                    if param_ind >=param_optional {
+                        param_found=true;
+                        param_optional_used=true;
+                    }
+                }
+
+                break;
+            }
+        } //end for (param_ind)
+
+        //after looping through params
+        if param_found { //all success
+            // println!("==a");
+            record_val_ind2=record_val_ind3;
+            many_count+=1;
+
+            if !param_optional_used && param_group.repeat() && record_val_ind3<record_vals.len() {
+                continue;
+            }
+        } else if !param_group.optional() && (!param_group.repeat() || many_count==0) {
+            // println!("==b");
+            // ok2=false; //node fail
+            ok=false; //node fail
+        }
+
+        //
+        break;
+    } //end loop (repeats)
+
+    //
+    // println!("group1 is {:?}, many_count={many_count}, ok2={ok}",param_group.name());
+
+    //
+    // if !ok2 {
+    //     break;
+    // }
+    if !ok {
+        // break;
+        return Some(false);
+    }
+
+    //
+    //after completing a param group, store it
+    // if last_param_group_ind!=param_group_ind
+    {
+        //
+        let group_name_text_ind= param_group.name().map(|group_name|{
+            if let Some(text_ind)=text_map.get(group_name) {
+                *text_ind
+            } else {
+                let text_ind=texts.len();
+                text_map.insert(group_name.to_string(), text_ind);
+                texts.push(group_name.to_string());
+                text_ind
+            }
+        });
+
+        //
+        let conf_values=if many_count!=0 {conf_val_start+ *record_val_ind..conf_val_start+record_val_ind2} else {0..0};
+
+        //
+        cur_param_groups.push(TempParamGroup {
+            param_group_ind : *param_group_ind,
+            conf_param_group:conf::ParamGroup {
+                conf_values,
+                name: group_name_text_ind,
+                params_num: param_group.params_num(),
+                optional:param_group.optional(),
+                repeat:param_group.repeat(),
+            }
+        });
+    }
+
+    if many_count!=0 {
+        *record_val_ind=record_val_ind2;
+        //println!("====5 {record_val_ind}={record_val_ind2}");
+    }
+
+    //
+    *param_group_ind+=1;
+
+    //
+    if *param_group_ind==node.param_groups_num() { //is last param group
+        // record_val_ind=record_last_val_ind; //restore record_val_ind to last successful param_group match //why?
+        //println!("====6");
+        // break;
+        return Some(ok); //ok should be true?
+
+    }
+
+    None
+} //
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
     src : &'a str,
@@ -621,7 +799,7 @@ pub fn parse_start<'a>(
                         }
                         Some(false) => {
                             // ok=false; //not necessary since breaking out and ok not used outside
-                            break;
+                            break; //should it really be breaking out? wouldn't it want to continue with the next node?
                         }
                         None => {
                             continue;
@@ -654,164 +832,21 @@ pub fn parse_start<'a>(
                         }
 
                         //(else?) handle param group
-                        {
-                            let mut many_count=0;
-                            let mut param_found=false;
-                            let mut param_optional_used=false;
-                            let mut record_val_ind2=record_val_ind;
+                        if let Some(x)=parse_group(
+                            node,
+                            record_vals,
+                            &mut record_val_ind,
+                            &mut record_attempted_parse_vals,
+                            &mut texts,
+                            &mut text_map,
+                            &mut cur_param_groups,
+                            conf_val_start,
+                            &mut param_group_ind,
+                        ) {
+                            ok=x;
+                            break;
+                        }
 
-                            // let mut ok2=true;
-
-                            loop { //for repeats
-                                //println!("==loop repeat {record_val_ind}, {record_val_ind2}");
-                                let mut record_val_ind3=record_val_ind2;
-
-                                //get vals for params
-                                for param_ind in 0..param_group.params_num() {
-                                    // println!("=== p={param_ind}, r={record_val_ind3} rl={}",record_vals.len());
-
-                                    //only used
-                                    if record_val_ind3 == record_vals.len() {
-                                        // println!("hmm2 p={param_ind} r={record_val_ind3} {:?}",record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)));
-                                        if let Some(param_optional)=param_group.param_optional() {
-                                            if param_ind >=param_optional {
-                                                param_found=true;
-                                                param_optional_used=true;
-                                            }
-                                        }
-                                        break;
-                                    }
-                                    //
-                                    let param_type_id=param_group.param_type_id(param_ind);
-
-                                    if let Some(param_type_id)=param_type_id{
-                                        let param_type_name=param_group.param_type_name(param_ind).unwrap();
-
-                                        let param_parsed=record_attempted_parse_vals
-                                            .entry(record_val_ind3).or_default() //-record_val_start
-                                            .entry(param_type_id).or_insert_with(||
-                                        {
-                                            let val = record_vals.get(record_val_ind3).unwrap();
-                                            let text=texts.get(val.text_ind).unwrap();
-
-                                            //does none repesent param_any? don't think so, just the parse failed
-                                            //  storing none just tells it that the parse has already been attempted and failed
-                                            let v=param_group.param_parse(param_ind, text.as_str());
-
-                                            v.map(|v|(param_type_name,v))
-                                        });
-                                        param_found=param_parsed.is_some();
-                                    } else { //does it mean any? yes..
-                                        param_found=true;
-                                    }
-
-
-                                    //
-                                    if param_found { //param matches value
-                                        // println!("hmm1 p={param_ind} r={record_val_ind3} {:?}, rlen={}",
-                                        //     record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)),
-                                        //     record_vals.len(),
-                                        // );
-                                        record_val_ind3+=1;
-                                        //println!("====x {record_val_ind3}");
-                                    // } else if let Some(param_optional)=param_group.param_optional() {
-                                    //     if param_ind >=param_optional {
-                                    //         param_found=true;
-                                    //     } else {
-                                    //         break;
-                                    //     }
-                                    } else {
-                                        // println!("hmm0 p={param_ind} r={record_val_ind3} {:?}",record_vals.get(record_val_ind3).and_then(|val|texts.get(val.text_ind)));
-
-                                        //only handles incorrect param type, not too little record vals
-                                        if let Some(param_optional)=param_group.param_optional() {
-                                            if param_ind >=param_optional {
-                                                param_found=true;
-                                                param_optional_used=true;
-                                            }
-                                        }
-
-                                        break;
-                                    }
-                                } //end for (param_ind)
-
-                                //after looping through params
-                                if param_found { //all success
-                                    // println!("==a");
-                                    record_val_ind2=record_val_ind3;
-                                    many_count+=1;
-
-                                    if !param_optional_used && param_group.repeat() && record_val_ind3<record_vals.len() {
-                                        continue;
-                                    }
-                                } else if !param_group.optional() && (!param_group.repeat() || many_count==0) {
-                                    // println!("==b");
-                                    // ok2=false; //node fail
-                                    ok=false; //node fail
-                                }
-
-                                //
-                                break;
-                            } //end loop (repeats)
-
-                            //
-                            // println!("group1 is {:?}, many_count={many_count}, ok2={ok}",param_group.name());
-
-                            //
-                            // if !ok2 {
-                            //     break;
-                            // }
-                            if !ok {
-                                break;
-                            }
-
-                            //
-                            //after completing a param group, store it
-                            // if last_param_group_ind!=param_group_ind
-                            {
-                                //
-                                let group_name_text_ind= param_group.name().map(|group_name|{
-                                    if let Some(text_ind)=text_map.get(group_name) {
-                                        *text_ind
-                                    } else {
-                                        let text_ind=texts.len();
-                                        text_map.insert(group_name.to_string(), text_ind);
-                                        texts.push(group_name.to_string());
-                                        text_ind
-                                    }
-                                });
-
-                                //
-                                let conf_values=if many_count!=0 {conf_val_start+record_val_ind..conf_val_start+record_val_ind2} else {0..0};
-
-                                //
-                                cur_param_groups.push(TempParamGroup {
-                                    param_group_ind,
-                                    conf_param_group:conf::ParamGroup {
-                                        conf_values,
-                                        name: group_name_text_ind,
-                                        params_num: param_group.params_num(),
-                                        optional:param_group.optional(),
-                                        repeat:param_group.repeat(),
-                                    }
-                                });
-                            }
-
-                            if many_count!=0 {
-                                record_val_ind=record_val_ind2;
-                                //println!("====5 {record_val_ind}={record_val_ind2}");
-                            }
-
-                            //
-                            param_group_ind+=1;
-
-                            //
-                            if param_group_ind==node.param_groups_num() { //is last param group
-                                // record_val_ind=record_last_val_ind; //restore record_val_ind to last successful param_group match //why?
-                                //println!("====6");
-                                break;
-                            }
-                        } //
                     } //end while (record_val_ind)
 
                     //
