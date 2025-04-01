@@ -113,16 +113,6 @@ struct TempRecord {
     tag:bool,
 }
 
-// let mut texts=Vec::<String>::new();
-// let mut text_map=HashMap::<String,usize>::new();
-// let mut all_param_groups = Vec::<conf::ParamGroup>::new();
-// let mut all_values = Vec::<Value>::new();
-// let mut all_parsed_values= Vec::new();
-// let mut cur_parent = 0;
-// let mut last_indent = 0;
-// let mut tags_useds = vec![HashSet::<String>::new()]; //tags_useds[node_depth] = parent_tags_used
-// let mut node_children_stk=Vec::<NodeChildrenContainer>::new();
-
 fn parse_single_group(
     node:NodeContainer,record_vals: &[Value],
     record_val_start: usize,
@@ -205,6 +195,245 @@ fn parse_single_group(
     });
 
     Some(true)
+}
+
+// let mut texts=Vec::<String>::new();
+// let mut text_map=HashMap::<String,usize>::new();
+// let mut all_param_groups = Vec::<conf::ParamGroup>::new();
+// let mut all_values = Vec::<Value>::new();
+// let mut all_parsed_values= Vec::new();
+// let mut cur_parent = 0;
+// let mut last_indent = 0;
+// let mut tags_useds = vec![HashSet::<String>::new()]; //tags_useds[node_depth] = parent_tags_used
+// let mut node_children_stk=Vec::<NodeChildrenContainer>::new();
+
+
+fn parse_adjacent_groups(
+    node:NodeContainer,record_vals: &[Value],
+    record_val_ind: &mut usize,
+    record_attempted_parse_vals:&mut HashMap<usize,HashMap<TypeId,Option<(&'static str,Box<dyn Any+Send+Sync>)>>>,
+    texts:&mut Vec<String>,
+    text_map:&mut HashMap<String,usize>,
+    cur_param_groups: &mut Vec<TempParamGroup>,
+    param_group_ind:&mut usize,
+    conf_val_start:usize,
+) -> bool { //true=continue
+    let param_group=node.param_group(*param_group_ind).unwrap();
+
+    if !(param_group.similar()!=GroupSimilar::None && param_group.param_optional().is_none() && (param_group.optional() || param_group.repeat()) )
+    {
+        return false;
+    }
+
+    //
+    let mut has_repeat=param_group.repeat();
+    let mut param_group_ind2=*param_group_ind+1;
+
+    // let mut total_tuple_count=param_group.params_patterns_num();
+    let mut optional_tuple_count=if param_group.optional(){param_group.params_patterns_num()}else{0};
+    let mut needed_tuple_count=if param_group.optional(){0}else{param_group.params_patterns_num()};
+
+    //count num of param tuples matching the pattern in param groups
+    while param_group_ind2<node.param_groups_num() {
+        let param_group2=node.param_group(param_group_ind2).unwrap();
+
+        //do not use patterns when using param_optional
+        if param_group.similar()!=param_group2.similar() || param_group2.param_optional().is_some() {
+            break;
+        }
+
+        //check the params groups have same pattern
+        if param_group.params_pattern_len()==param_group2.params_pattern_len() {
+            let mut i=0;
+
+            while i<param_group.params_pattern_len()
+                && param_group.param_type_id(i)==param_group2.param_type_id(i)
+            {
+                i+=1;
+            }
+
+            if i!=param_group.params_pattern_len() { //stop if param groups patterns not the same
+                break;
+            }
+        }
+
+        //
+        if !param_group2.optional() {
+            needed_tuple_count+=param_group2.params_patterns_num();
+        } else {
+            optional_tuple_count+=param_group2.params_patterns_num();
+        }
+
+        // println!("------total_tuple_count={total_tuple_count}");
+        param_group_ind2+=1;
+        has_repeat|=param_group2.repeat();
+    }
+
+    //
+    let total_tuple_count=optional_tuple_count+needed_tuple_count; //non repeating
+    let adj_param_groups_num=param_group_ind2- *param_group_ind;
+
+    //needed_tuple_count total_tuple_count
+    //println!("\tadj_param_groups_num={adj_param_groups_num}");
+
+    //on more than one adj param group with same pattern
+    if adj_param_groups_num>1 {
+        let mut record_val_ind2=*record_val_ind;
+
+        //get all record values matching pattern
+        loop {
+
+            //can exit early if no repeats and vals count eq to needed tuples count * pattern_len
+            if !has_repeat && (record_val_ind2- *record_val_ind)==total_tuple_count*param_group.params_pattern_len() {
+                break;
+            }
+
+            //
+            let mut param_found=false;
+
+            //
+            for pattern_ind in 0..param_group.params_pattern_len() {
+                //
+                param_found=param_group.param_type_id(pattern_ind).map(|param_type_id|{
+                    record_attempted_parse_vals
+                        .entry(record_val_ind2).or_default() //-record_val_start
+                        .entry(param_type_id).or_insert_with(||
+                    {
+                        let val = record_vals.get(record_val_ind2).unwrap();
+                        let text=texts.get(val.text_ind).unwrap();
+                        let v=param_group.param_parse(pattern_ind, text.as_str());
+
+                        v.map(|v|(param_group.param_type_name(pattern_ind).unwrap(),v))
+                    }).is_some()
+                }).unwrap_or(true);
+
+                //
+                if param_found { //param matches value
+                    record_val_ind2+=1;
+                } else {
+                    break;
+                }
+            }
+
+            //
+            if !param_found || record_val_ind2==record_vals.len() {
+                break;
+            }
+        }
+
+        //
+        let found_vals_num=record_val_ind2- *record_val_ind;
+
+        //
+        // println!("thevals {:?}", (record_val_ind..record_val_ind2).map(|i|{
+        //     let text_ind=record_vals.get(i).unwrap().text_ind;
+        //     texts.get(text_ind).unwrap()
+        // }).collect::<Vec<_>>());
+
+        //
+        if needed_tuple_count*param_group.params_pattern_len() <= found_vals_num && (
+            has_repeat
+            || needed_tuple_count*param_group.params_pattern_len() == found_vals_num
+            || total_tuple_count*param_group.params_pattern_len() == found_vals_num
+        ) {
+            //println!("-------tryyyy");
+
+            // let from_right=node.rsimilar();
+            let from_right = param_group.similar()==GroupSimilar::Right;
+
+            //int? int? int int*
+            //int* int? int? int
+            //int? int* int
+            //int int* int?
+
+            let mut tuple_assigns= Vec::new(); //(0..(param_group_ind2-param_group_ind)).
+            tuple_assigns.resize(adj_param_groups_num, 0);
+
+            let mut remaining_tuple_count= (found_vals_num/param_group.params_pattern_len())-needed_tuple_count;
+            //println!("remaining_tuple_count={remaining_tuple_count}");
+            //println!("--hm1 {}-{needed_tuple_count} ={remaining_tuple_count} ",found_vals_num/param_group.params_pattern_len());
+
+            //assign tuples to param groups
+            for i in 0 .. adj_param_groups_num {
+                let i=if from_right{adj_param_groups_num-i-1}else{i};
+                let param_group_ind3=*param_group_ind+i;
+                let param_group3=node.param_group(param_group_ind3).unwrap();
+                let params_patterns_num=param_group3.params_patterns_num();
+
+                if !param_group3.optional() {
+                    tuple_assigns[i]=params_patterns_num;
+                    //println!("ggg n {:?} = {}",param_group3.name(),tuple_assigns[i]);
+                } else if remaining_tuple_count>=params_patterns_num {
+                    tuple_assigns[i]=params_patterns_num;
+                    remaining_tuple_count-=params_patterns_num;
+                    //println!("ggg o {:?} = {}",param_group3.name(),tuple_assigns[i]);
+                }
+
+                if param_group3.repeat() {
+                    while remaining_tuple_count>=params_patterns_num {
+                        tuple_assigns[i]+=params_patterns_num;
+                        //println!("~~~ {remaining_tuple_count}-={params_patterns_num}");
+                        remaining_tuple_count-=params_patterns_num;
+                    }
+                }
+
+            }
+
+            //
+            if remaining_tuple_count==0 {
+                //println!("--ok {remaining_tuple_count} {tuple_assigns:?}");
+
+                for (i,&tuple_assign) in tuple_assigns.iter().enumerate() {
+                    let param_group_ind2=*param_group_ind+i;
+                    let param_group2=node.param_group(param_group_ind2).unwrap();
+                    // println
+                    //
+                    let group_name_text_ind= param_group2.name().map(|group_name|{
+                        if let Some(text_ind)=text_map.get(group_name) {
+                            *text_ind
+                        } else {
+                            let text_ind=texts.len();
+                            text_map.insert(group_name.to_string(), text_ind);
+                            texts.push(group_name.to_string());
+                            text_ind
+                        }
+                    });
+
+                    //
+                    //println!("record_val_ind {record_val_ind} + {tuple_assign}*{}",param_group2.params_num());
+                    let record_val_num =tuple_assign*param_group2.params_pattern_len();
+
+                    //println!("!!! record_val_ind {record_val_ind}, record_val_num {record_val_num}");
+                    //
+                    cur_param_groups.push(TempParamGroup {
+                        param_group_ind:param_group_ind2,
+                        conf_param_group:conf::ParamGroup {
+                            conf_values: conf_val_start+ *record_val_ind..conf_val_start+ *record_val_ind+record_val_num,
+                            name: group_name_text_ind,
+                            params_num: param_group2.params_num(),
+                            optional:param_group2.optional(),
+                            repeat:param_group2.repeat(),
+                        }
+                    });
+
+                    *record_val_ind+=record_val_num;
+
+                }
+
+                *param_group_ind=param_group_ind2;
+                // continue;
+                return true;
+            } else {
+                //println!("---no {remaining_tuple_count} {tuple_assigns:?}");
+            }
+        }
+
+        //
+    }
+
+    //
+    false
+
 }
 pub fn parse_start<'a>(
     root_branch:BranchContainer,
@@ -417,210 +646,11 @@ pub fn parse_start<'a>(
                         //handle adjacent param groups that share a pattern
                         //  do not use patterns when using param_optional
                         // println!("gs {:?}",param_group.similar());
-                        if param_group.similar()!=GroupSimilar::None && param_group.param_optional().is_none() && (param_group.optional() || param_group.repeat()) {
-                            let mut has_repeat=param_group.repeat();
-                            let mut param_group_ind2=param_group_ind+1;
 
-                            // let mut total_tuple_count=param_group.params_patterns_num();
-                            let mut optional_tuple_count=if param_group.optional(){param_group.params_patterns_num()}else{0};
-                            let mut needed_tuple_count=if param_group.optional(){0}else{param_group.params_patterns_num()};
-
-                            //count num of param tuples matching the pattern in param groups
-                            while param_group_ind2<node.param_groups_num() {
-                                let param_group2=node.param_group(param_group_ind2).unwrap();
-
-                                //do not use patterns when using param_optional
-                                if param_group.similar()!=param_group2.similar() || param_group2.param_optional().is_some() {
-                                    break;
-                                }
-
-                                //check the params groups have same pattern
-                                if param_group.params_pattern_len()==param_group2.params_pattern_len() {
-                                    let mut i=0;
-
-                                    while i<param_group.params_pattern_len()
-                                        && param_group.param_type_id(i)==param_group2.param_type_id(i)
-                                    {
-                                        i+=1;
-                                    }
-
-                                    if i!=param_group.params_pattern_len() { //stop if param groups patterns not the same
-                                        break;
-                                    }
-                                }
-
-                                //
-                                if !param_group2.optional() {
-                                    needed_tuple_count+=param_group2.params_patterns_num();
-                                } else {
-                                    optional_tuple_count+=param_group2.params_patterns_num();
-                                }
-
-                                // println!("------total_tuple_count={total_tuple_count}");
-                                param_group_ind2+=1;
-                                has_repeat|=param_group2.repeat();
-                            }
-
-                            //
-                            let total_tuple_count=optional_tuple_count+needed_tuple_count; //non repeating
-                            let adj_param_groups_num=param_group_ind2-param_group_ind;
-
-                            //needed_tuple_count total_tuple_count
-                            //println!("\tadj_param_groups_num={adj_param_groups_num}");
-
-                            //on more than one adj param group with same pattern
-                            if adj_param_groups_num>1 {
-                                let mut record_val_ind2=record_val_ind;
-
-                                //get all record values matching pattern
-                                loop {
-
-                                    //can exit early if no repeats and vals count eq to needed tuples count * pattern_len
-                                    if !has_repeat && (record_val_ind2-record_val_ind)==total_tuple_count*param_group.params_pattern_len() {
-                                        break;
-                                    }
-
-                                    //
-                                    let mut param_found=false;
-
-                                    //
-                                    for pattern_ind in 0..param_group.params_pattern_len() {
-                                        //
-                                        param_found=param_group.param_type_id(pattern_ind).map(|param_type_id|{
-                                            record_attempted_parse_vals
-                                                .entry(record_val_ind2).or_default() //-record_val_start
-                                                .entry(param_type_id).or_insert_with(||
-                                            {
-                                                let val = record_vals.get(record_val_ind2).unwrap();
-                                                let text=texts.get(val.text_ind).unwrap();
-                                                let v=param_group.param_parse(pattern_ind, text.as_str());
-
-                                                v.map(|v|(param_group.param_type_name(pattern_ind).unwrap(),v))
-                                            }).is_some()
-                                        }).unwrap_or(true);
-
-                                        //
-                                        if param_found { //param matches value
-                                            record_val_ind2+=1;
-                                        } else {
-                                            break;
-                                        }
-                                    }
-
-                                    //
-                                    if !param_found || record_val_ind2==record_vals.len() {
-                                        break;
-                                    }
-                                }
-
-                                //
-                                let found_vals_num=record_val_ind2-record_val_ind;
-
-                                //
-                                // println!("thevals {:?}", (record_val_ind..record_val_ind2).map(|i|{
-                                //     let text_ind=record_vals.get(i).unwrap().text_ind;
-                                //     texts.get(text_ind).unwrap()
-                                // }).collect::<Vec<_>>());
-
-                                //
-                                if needed_tuple_count*param_group.params_pattern_len() <= found_vals_num && (
-                                    has_repeat
-                                    || needed_tuple_count*param_group.params_pattern_len() == found_vals_num
-                                    || total_tuple_count*param_group.params_pattern_len() == found_vals_num
-                                ) {
-                                    //println!("-------tryyyy");
-
-                                    // let from_right=node.rsimilar();
-                                    let from_right = param_group.similar()==GroupSimilar::Right;
-
-                                    //int? int? int int*
-                                    //int* int? int? int
-                                    //int? int* int
-                                    //int int* int?
-
-                                    let mut tuple_assigns= Vec::new(); //(0..(param_group_ind2-param_group_ind)).
-                                    tuple_assigns.resize(adj_param_groups_num, 0);
-
-                                    let mut remaining_tuple_count= (found_vals_num/param_group.params_pattern_len())-needed_tuple_count;
-                                    //println!("remaining_tuple_count={remaining_tuple_count}");
-                                    //println!("--hm1 {}-{needed_tuple_count} ={remaining_tuple_count} ",found_vals_num/param_group.params_pattern_len());
-
-                                    //assign tuples to param groups
-                                    for i in 0 .. adj_param_groups_num {
-                                        let i=if from_right{adj_param_groups_num-i-1}else{i};
-                                        let param_group_ind3=param_group_ind+i;
-                                        let param_group3=node.param_group(param_group_ind3).unwrap();
-                                        let params_patterns_num=param_group3.params_patterns_num();
-
-                                        if !param_group3.optional() {
-                                            tuple_assigns[i]=params_patterns_num;
-                                            //println!("ggg n {:?} = {}",param_group3.name(),tuple_assigns[i]);
-                                        } else if remaining_tuple_count>=params_patterns_num {
-                                            tuple_assigns[i]=params_patterns_num;
-                                            remaining_tuple_count-=params_patterns_num;
-                                            //println!("ggg o {:?} = {}",param_group3.name(),tuple_assigns[i]);
-                                        }
-
-                                        if param_group3.repeat() {
-                                            while remaining_tuple_count>=params_patterns_num {
-                                                tuple_assigns[i]+=params_patterns_num;
-                                                //println!("~~~ {remaining_tuple_count}-={params_patterns_num}");
-                                                remaining_tuple_count-=params_patterns_num;
-                                            }
-                                        }
-
-                                    }
-
-                                    //
-                                    if remaining_tuple_count==0 {
-                                        //println!("--ok {remaining_tuple_count} {tuple_assigns:?}");
-
-                                        for (i,&tuple_assign) in tuple_assigns.iter().enumerate() {
-                                            let param_group_ind2=param_group_ind+i;
-                                            let param_group2=node.param_group(param_group_ind2).unwrap();
-                                            // println
-                                            //
-                                            let group_name_text_ind= param_group2.name().map(|group_name|{
-                                                if let Some(text_ind)=text_map.get(group_name) {
-                                                    *text_ind
-                                                } else {
-                                                    let text_ind=texts.len();
-                                                    text_map.insert(group_name.to_string(), text_ind);
-                                                    texts.push(group_name.to_string());
-                                                    text_ind
-                                                }
-                                            });
-
-                                            //
-                                            //println!("record_val_ind {record_val_ind} + {tuple_assign}*{}",param_group2.params_num());
-                                            let record_val_num =tuple_assign*param_group2.params_pattern_len();
-
-                                            //println!("!!! record_val_ind {record_val_ind}, record_val_num {record_val_num}");
-                                            //
-                                            cur_param_groups.push(TempParamGroup {
-                                                param_group_ind:param_group_ind2,
-                                                conf_param_group:conf::ParamGroup {
-                                                    conf_values: conf_val_start+record_val_ind..conf_val_start+record_val_ind+record_val_num,
-                                                    name: group_name_text_ind,
-                                                    params_num: param_group2.params_num(),
-                                                    optional:param_group2.optional(),
-                                                    repeat:param_group2.repeat(),
-                                                }
-                                            });
-
-                                            record_val_ind+=record_val_num;
-
-                                        }
-
-                                        param_group_ind=param_group_ind2;
-                                        continue;
-                                    } else {
-                                        //println!("---no {remaining_tuple_count} {tuple_assigns:?}");
-                                    }
-                                }
-
-                                //
-                            }
+                        if parse_adjacent_groups(node,record_vals,&mut record_val_ind,&mut record_attempted_parse_vals,
+                            &mut texts,&mut text_map,&mut cur_param_groups,&mut  param_group_ind,conf_val_start,
+                        ) {
+                            continue;
                         }
 
                         //(else?) handle param group
