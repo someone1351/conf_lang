@@ -734,7 +734,6 @@ pub fn parse_start<'a>(
             // }
             if last_indent.is_some() {
                 if indent==last_indent.unwrap()+1 { //parent=cur_parent.child.last
-                    println!("{cur_parent} {:?}",&temp_records[cur_parent].children_records);
                     cur_parent=temp_records[cur_parent].children_records.last().cloned().unwrap();
                 } else if indent < last_indent.unwrap() {
                     for _ in indent .. last_indent.unwrap() { //parent=parent.parent
