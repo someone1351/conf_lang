@@ -663,7 +663,7 @@ pub fn parse_start<'a>(
     let mut all_values = Vec::<Value>::new();
     let mut all_parsed_values= Vec::new();
     let mut cur_parent = 0;
-    let mut last_indent = 0;
+    let mut last_indent:Option<usize> = None;
     let mut tags_useds = vec![HashSet::<String>::new()]; //tags_useds[node_depth] = parent_tags_used
     let mut node_children_stk=Vec::<NodeChildrenContainer>::new();
 
@@ -729,14 +729,20 @@ pub fn parse_start<'a>(
             let all_val_end=all_values.len();
             let record_vals: &[Value]=&all_values[conf_val_start..all_val_end];
 
-            if indent==last_indent+1 { //parent=cur_parent.child.last
-                cur_parent=temp_records[cur_parent].children_records.last().cloned().unwrap();
-            } else if indent < last_indent {
-                for _ in indent .. last_indent { //parent=parent.parent
-                    cur_parent=temp_records[cur_parent].parent.unwrap();
-                }
-            } else if indent == last_indent {
+            // if last_indent.is_none() && indent!=0 {
 
+            // }
+            if last_indent.is_some() {
+                if indent==last_indent.unwrap()+1 { //parent=cur_parent.child.last
+                    println!("{cur_parent} {:?}",&temp_records[cur_parent].children_records);
+                    cur_parent=temp_records[cur_parent].children_records.last().cloned().unwrap();
+                } else if indent < last_indent.unwrap() {
+                    for _ in indent .. last_indent.unwrap() { //parent=parent.parent
+                        cur_parent=temp_records[cur_parent].parent.unwrap();
+                    }
+                } else if indent == last_indent.unwrap() {
+
+                }
             }
 
             //
@@ -772,7 +778,7 @@ pub fn parse_start<'a>(
             };
 
             //
-            last_indent=indent;
+            last_indent=Some(indent);
 
             //
             let mut found_node=None;
@@ -1123,7 +1129,7 @@ pub fn parse_start<'a>(
 }
 
 
-fn parse_record<'a>(lexer : &mut Lexer,last_indent:usize,
+fn parse_record<'a>(lexer : &mut Lexer,last_indent:Option<usize>,
     // src:&'a str,
     path:Option<&'a Path>,) -> Result<Option<(usize,Vec<Token>)>,ParseError> {
     // record => indent val (sep val)* (cmnt | ending)
@@ -1196,7 +1202,7 @@ fn parse_record<'a>(lexer : &mut Lexer,last_indent:usize,
     Ok(Some((indent,tokens)))
 }
 
-fn parse_body<'a>(lexer : &mut Lexer,last_indent:usize,
+fn parse_body<'a>(lexer : &mut Lexer,last_indent:Option<usize>,
     // src:&'a str,
     path:Option<&'a Path>) -> Result<Vec<Token>,ParseError> {
     // body => {has_record_body}: (ending|indent not_eols ending)+
@@ -1224,7 +1230,7 @@ fn parse_body<'a>(lexer : &mut Lexer,last_indent:usize,
         //     break;
         // }
 
-        if indent<=last_indent {
+        if last_indent.is_some() && indent<=last_indent.unwrap() {
             lexer.pop_discard();
             break;
         }
@@ -1396,7 +1402,7 @@ fn parse_qval<'a>(lexer : &mut Lexer,quote:&str,tripple:bool,
 
 
 
-fn parse_indent<'a>(lexer : &mut Lexer,last_indent:usize, in_body:bool,
+fn parse_indent<'a>(lexer : &mut Lexer,last_indent:Option<usize>, in_body:bool,
     // src:&'a str,
     path:Option<&'a Path>) -> Result<usize,ParseError> {
     // indent => [\s\t]*
@@ -1424,7 +1430,7 @@ fn parse_indent<'a>(lexer : &mut Lexer,last_indent:usize, in_body:bool,
         //it should
         //maybe an indent is only valid for a body if up to last_indent+1 is made of up tabs and spcs%4=0
 
-        if in_body && spcs>=last_indent*4+4 { //indent>=last_indent
+        if in_body && last_indent.is_some() && spcs>=last_indent.unwrap()*4+4 { //indent>=last_indent
             break;
         }
     }
@@ -1433,12 +1439,12 @@ fn parse_indent<'a>(lexer : &mut Lexer,last_indent:usize, in_body:bool,
     let indent=spcs/4;
 
 
-    if in_body && indent <=last_indent {
+    if in_body && last_indent.is_some() && indent <=last_indent.unwrap() { //body is text body of a record? (not more records)
         //
         lexer.debug_label_pop();
 
         //
-        Ok(0)
+        Ok(0) //why 0?
     } else {
         lexer.skip(i);
 
@@ -1453,7 +1459,13 @@ fn parse_indent<'a>(lexer : &mut Lexer,last_indent:usize, in_body:bool,
                 error_type:ParseErrorType::InvalidIndentIncrement,
             })
             // Err((lexer.loc(),"indents must be increments of 4"))
-        } else if indent>last_indent+1 {
+        } else if last_indent.is_none() && indent!=0 {
+            Err(ParseError{
+                path:path.map(|p|p.to_path_buf()),
+                loc:lexer.loc(),
+                error_type:ParseErrorType::InvalidIndent,
+            })
+        } else if indent>last_indent.unwrap_or(0)+1 {
             Err(ParseError{
                 path:path.map(|p|p.to_path_buf()),
                 loc:lexer.loc(),
