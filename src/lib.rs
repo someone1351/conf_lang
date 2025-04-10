@@ -1,5 +1,9 @@
 
-
+/*
+Slight problems
+* when using parse_func, it uses it's return type id, so if two dif funcs used that have the same return type, then treated the same
+* should only allow comments at beginning of a line (including after indent)?
+*/
 
 mod def;
 mod lexer;
