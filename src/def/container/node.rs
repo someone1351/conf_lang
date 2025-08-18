@@ -40,7 +40,7 @@ impl<'a> NodeContainer<'a> {
         node.branch_ind
     }
 
-    pub fn branch(&self) -> BranchContainer {
+    pub fn branch(&self) -> BranchContainer<'_> {
         let branch_ind=self.branch_ind();
         BranchContainer { def: self.def, branch_ind, }
     }

@@ -192,6 +192,7 @@ fn walk_test3() {
 
     let src="
 hello a b
+#hello cd
     ";
 
     let conf=match def.get_root_branch().parse(src, true,Some(&PathBuf::from("test3"))) {

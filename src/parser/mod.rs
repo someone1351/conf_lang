@@ -1167,11 +1167,11 @@ fn parse_record<'a>(lexer : &mut Lexer,last_indent:Option<usize>,
         }
 
         //
-        if parse_cmnt(lexer) {
-            lexer.pop_keep();
-            lexer.debug_label_pop();
-            return Ok(Some((indent,tokens)));
-        }
+        // if parse_cmnt(lexer) {
+        //     lexer.pop_keep();
+        //     lexer.debug_label_pop();
+        //     return Ok(Some((indent,tokens)));
+        // }
 
         //
         if !parse_val(lexer,path)? {

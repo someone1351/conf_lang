@@ -52,14 +52,14 @@ pub struct Conf {
 }
 
 impl Conf {
-    pub fn root(&self) -> container::record::RecordContainer {
+    pub fn root(&self) -> container::record::RecordContainer<'_> {
         container::record::RecordContainer::new_root(self)
     }
 
     pub fn src(&self) -> Option<&str> {
         self.src.as_ref().map(|x|x.as_str())
     }
-    
+
     pub fn path(&self) -> Option<&Path> {
         self.path.as_ref().map(|x|x.as_path())
     }

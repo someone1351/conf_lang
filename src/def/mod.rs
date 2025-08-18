@@ -49,7 +49,7 @@ impl Def {
         }
     }
 
-    pub fn get_root_branch(&self) -> BranchContainer {
+    pub fn get_root_branch(&self) -> BranchContainer<'_> {
         BranchContainer {
             def:self,
             branch_ind:0,
@@ -63,7 +63,7 @@ impl Def {
     //     })
     // }
 
-    pub fn get_branch(&self, branch_name : &str) -> BranchContainer {
+    pub fn get_branch(&self, branch_name : &str) -> BranchContainer<'_> {
         BranchContainer {
             def:self,
             branch_ind:self.branch_map.get(branch_name).cloned().unwrap_or(self.branches.len()),
