@@ -7,6 +7,10 @@ Slight problems
 TODO
 * for grammar, instead of entry_children, entry_text, have children, text, if both are used, the last overwrites
 ** doing multiple children, attaches additional children
+
+* could remove tag/tagless and just replace tag with .str("mytag")
+** "once" would then work on any entry with .str as first?
+
 */
 
 mod def;
