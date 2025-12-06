@@ -27,7 +27,7 @@ impl<'a> ValueContainer<'a> {
         let val=self.conf.unwrap().values.get(self.conf_value_ind).unwrap();
         val.start_loc
     }
-    
+
     pub fn end_loc(&self) -> Loc {
         if self.conf.is_none() {return Loc::zero();};
         let val=self.conf.unwrap().values.get(self.conf_value_ind).unwrap();
@@ -61,13 +61,16 @@ impl<'a> ValueContainer<'a> {
         self.get_parsed().unwrap_or_default()
     }
 
+    pub fn parsed_or<T:Any+Clone>(&self,d:T) -> T {
+        self.get_parsed().unwrap_or(d)
+    }
     pub fn parsed_name(&self) -> Option<&'static str> {
         if self.conf.is_none() {return None;};
         let val=self.conf.unwrap().values.get(self.conf_value_ind).unwrap();
         let parsed=val.parsed_ind.map(|parsed_ind|self.conf.unwrap().parsed_values.get(parsed_ind).unwrap());
         parsed.map(|x|x.0)
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.conf.is_none()
     }
