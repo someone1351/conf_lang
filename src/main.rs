@@ -33,8 +33,13 @@ fn walk_test1_def() -> conf_lang::Def {
             .tags(["node"])
                 .entry_children("root_branch")
                     .param_any()
-        //     .include(["rest_branch"])
-        // .branch("rest_branch").tagless_nodes().entry_children(Some("rest"),"rest_branch").group(None, false, true).param_any()
+            .include(["rest_branch"])
+        .branch("rest_branch")
+            .tagless()
+                .entry_children("rest_branch").elabel("rest",)
+                    .group().grepeat() //.goptional()
+                    // .group(None, false, true)
+                        .param_any()
 }
 
 fn walk_test1() {

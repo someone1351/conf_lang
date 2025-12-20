@@ -58,15 +58,15 @@ impl<'a> Lexer<'a> {
             // debug_break_loop_max:0,
             // debug_break_loop_count:0,
             // debug_lasts:HashSet::new(),
-        } 
+        }
     }
 
     pub fn debug_label_push(&mut self,debug_label_str:&'a str) {
-        self.debug_label_strs.push(debug_label_str); 
+        self.debug_label_strs.push(debug_label_str);
     }
 
     pub fn debug_label_pop(&mut self) {
-        self.debug_label_strs.pop().unwrap();  
+        self.debug_label_strs.pop().unwrap();
     }
 
 
@@ -76,7 +76,7 @@ impl<'a> Lexer<'a> {
     // pub fn debug_break_loop(&mut self,debug_break_loop_num:usize) {
     //     self.debug_break_loop_max=debug_break_loop_num;
     // }
-    
+
     fn debug_print_cmd(&self,cmd:&str) {
         if self.debug_print_enable {
             print!("\"");
@@ -146,14 +146,14 @@ impl<'a> Lexer<'a> {
             panic!("Lexer stack size 0");
         }
 
-        self.error_manager.on_pop_keep();        
+        self.error_manager.on_pop_keep();
         self.stk.remove(self.stk.len()-2);
     }
 
 
     pub fn has<'b,const N:usize>(&mut self, i:usize,xs: [&'b str;N]) -> Option<&'b str> {
         let mut res=None;
-        
+
         let cur = self.stk.last_mut().unwrap();
 
         for &x in xs.iter() {
@@ -165,7 +165,7 @@ impl<'a> Lexer<'a> {
 
         //
         self.debug_print_cmd(format!("has({i}, {xs:?}) => {res:?}").as_str());
-        
+
         // if self.debug_break_loop_max!=0 {
         //     let loc = self.loc();
         //     let debug_last=DebugLast::Has { i, xs:xs.iter().map(|x|x.to_string()).collect::<Vec<_>>(), loc };
@@ -183,13 +183,13 @@ impl<'a> Lexer<'a> {
 
         res
     }
-    
+
     pub fn get(&mut self, i : usize, n : usize) -> Option<&str> {
 
         //
         let cur = self.stk.last_mut().unwrap();
         cur.input.reserve(i+n);
-        
+
         //
         let cur = self.stk.last().unwrap();
         let res=cur.input.get(i,n);
@@ -198,7 +198,7 @@ impl<'a> Lexer<'a> {
 
         // if self.debug_break_loop_max!=0 {
         //     let loc = self.loc();
- 
+
         //     let debug_last=DebugLast::Get { i, n, loc };
 
         //     if self.debug_lasts.contains(&debug_last) {
@@ -215,9 +215,9 @@ impl<'a> Lexer<'a> {
         res
     }
 
-    pub fn getc(&mut self, i : usize) -> Option<char> {   
+    pub fn getc(&mut self, i : usize) -> Option<char> {
 
-        let cur = self.stk.last_mut().unwrap(); 
+        let cur = self.stk.last_mut().unwrap();
         let res=cur.input.get_reserve(i,1).and_then(|s|s.chars().last());
 
         // if let Some(s) = cur.input.get(i,1) {
@@ -225,7 +225,7 @@ impl<'a> Lexer<'a> {
         // } else {
         //     None
         // }
-        
+
         self.debug_print_cmd(format!("getc({i} => {res:?})").as_str());
 
         // if self.debug_break_loop_max!=0 {
@@ -248,7 +248,7 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn is_end(&mut self) -> bool {
-        let cur = self.stk.last_mut().unwrap(); 
+        let cur = self.stk.last_mut().unwrap();
         let res=cur.input.get_reserve(0,1).and_then(|s|s.chars().last()).is_none();
 
         self.debug_print_cmd(format!("is_end => {res:?}").as_str());
@@ -268,10 +268,10 @@ impl<'a> Lexer<'a> {
             self.error_manager.on_next(self.loc());
             Some(())
         };
-        
+
         //
         self.debug_print_cmd(format!("skip({n}) => {res:?}").as_str());
-        
+
         // if self.debug_break_loop_max!=0 && n!=0 && res.is_some() {
         //     self.debug_lasts.clear();
         // }
@@ -303,14 +303,14 @@ impl<'a> Lexer<'a> {
                 cur.input.next(n);
                 token.end_loc = cur.input.loc();
             }
-            
+
             self.error_manager.on_next(self.loc());
 
             Some(())
         };
 
         self.debug_print_cmd(format!("consume({n}, {replace:?}) => {res:?}").as_str());
-        
+
         // if self.debug_break_loop_max!=0 && n!=0 && res.is_some() {
         //     self.debug_lasts.clear();
         // }
@@ -319,18 +319,19 @@ impl<'a> Lexer<'a> {
 
     }
 
-    pub fn token(&mut self) -> Option<Token> {
+    pub fn token(&mut self) -> Token //Option<Token>
+    {
 
         let cur = self.stk.last_mut().unwrap();
         let res=std::mem::take(&mut cur.token);
-        
+
         // let t = self.cur.token ;
         // self.cur.token = None;
         // println!("{:?}",self.cur.token);
         // t
-
+        let loc=cur.input.loc();
         self.debug_print_cmd(format!("token => {res:?}").as_str());
-        res
+        res.unwrap_or_else(||Token { start_loc: loc, end_loc: loc, extracted: String::new() })
     }
 
     pub fn set_token(&mut self, token : Token) {

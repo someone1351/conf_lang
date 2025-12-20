@@ -1153,7 +1153,7 @@ fn parse_record<'a>(lexer : &mut Lexer,last_indent:Option<usize>,
     }
 
     //
-    tokens.push(lexer.token().unwrap());
+    tokens.push(lexer.token()); //.unwrap()
     // println!("\n= {} {:?}\n",tokens.len()-1,tokens.last().unwrap());
     lexer.pop_keep();
 
@@ -1178,7 +1178,7 @@ fn parse_record<'a>(lexer : &mut Lexer,last_indent:Option<usize>,
             lexer.pop_discard();
             break;
         } else {
-            tokens.push(lexer.token().unwrap());
+            tokens.push(lexer.token()); //text "" //.unwrap()
             // println!("\n= {} {:?}\n",tokens.len()-1,tokens.last().unwrap());
             lexer.pop_keep();
         }
@@ -1238,7 +1238,7 @@ fn parse_body<'a>(lexer : &mut Lexer,last_indent:Option<usize>,
 
         //
         if parse_not_eols(lexer,false) {
-            tokens.push(lexer.token().unwrap());
+            tokens.push(lexer.token()); //.unwrap()
         }
 
         if !parse_ending(lexer) { //should always succeed
