@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::path::Path;
 
+
 use super::super::Conf;
 use super::super::super::lexer::Loc;
 
@@ -38,6 +39,30 @@ impl<'a> ValueContainer<'a> {
         if self.conf.is_none() {return Default::default();};
         self.conf.unwrap().path.as_ref().and_then(|x|Some(x.as_path()))
     }
+
+    // pub fn escaped_string<'s>(&self,func:fn(&'a str)->Option<String>) -> Option<String> {
+    //     let Some(s) = self.get_str() else {return  None;};
+
+    //     let mut lexer=Lexer::new(s);
+    //     let mut i=0;
+    //     let mut out=String::new();
+
+    //     loop {
+    //         // let c=lexer.get(0, 2);
+    //         if Some('\\')==lexer.getc(i) {
+    //             let c=lexer.getc(i+1);
+
+    //             if let Some(r)=func(c) { // what if \ \r\n
+
+    //             } else {
+
+    //             }
+    //         }
+
+    //     }
+
+    //     Some(out)
+    // }
 
     pub fn get_str(&self) -> Option<&'a str> {
         if self.conf.is_none() {return None;};
